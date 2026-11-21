@@ -12,13 +12,13 @@
 RepoContinuum follows a strict milestone-driven, test-first, human-controlled delivery methodology. Features are implemented sequentially in bounded vertical slices. No milestone proceeds until the preceding milestone meets its complete Definition of Done, including unit, integration, and security tests.
 
 ```text
-[Phase 0: Environment & Scaffold]
+[Phase 0: Environment & Scaffold]  ──> COMPLETE
              │
              ▼
-[Milestone 1: Repository Intelligence Foundation] ◄── CURRENT FOCUS
+[Milestone 1: Repository Intelligence Foundation] ──> COMPLETE
              │
              ▼
-[Milestone 2: Task Chains & Obligation Ledger]
+[Milestone 2: Task Chains & Obligation Ledger] ──> COMPLETE ◄── CURRENT FOCUS
              │
              ▼
 [Milestone 3: Patch & Isolated Verification Loop]
@@ -126,3 +126,46 @@ Deliver a robust, deterministic repository indexer that walks a Python repositor
 - [ ] Reproducible JSON snapshot and human-readable CLI report.
 - [ ] All unit, integration, and security tests passing.
 - [ ] README updated with setup and usage instructions.
+
+
+---
+
+## 5. Milestone 2 — Task Chains and Obligation Ledger
+
+### Goal
+Deliver a stateful, dependency-aware task chain orchestrator that models dependent maintenance tasks as a directed acyclic graph (DAG), enforces explicit lifecycle state transitions, maintains an active obligation ledger for acceptance criteria, and provides atomic persistence and checkpoint resumption across process restarts using SQLAlchemy 2.x and Alembic.
+
+### Key Components Delivered
+1. **Domain Models (`src/repocontinuum/domain/planning.py`)**:
+   - `TaskChain`: Root task chain with status (`CREATED`, `ACTIVE`, `COMPLETED`, `FAILED`, `CANCELLED`).
+   - `MaintenanceTask`: Task unit with status (`CREATED`, `READY`, `PLANNED`, `BLOCKED`, `IN_PROGRESS`, `COMPLETED`, `FAILED`, `CANCELLED`), order index, and acceptance criteria.
+   - `TaskDependency`: Directed predecessor ➔ successor relationship with cycle prevention.
+   - `Obligation`: Acceptance requirement tracked across its lifecycle (`active`, `superseded`, `withdrawn`).
+   - `Checkpoint`: Atomic snapshot of chain state, tasks, dependencies, and obligations.
+   - `AuditEvent`: Append-only audit record tracking actor, action, metadata, and timestamps.
+   - `DAGValidationReport`: Invariants report with cycle paths, missing dependencies, topological order, and blocked task breakdown.
+
+2. **Dependency Graph Engine (`src/repocontinuum/planning/dag.py`)**:
+   - Explicit predecessor/successor modeling with NetworkX.
+   - Cycle detection rejecting direct (`A ➔ B ➔ A`), transitive (`A ➔ B ➔ C ➔ A`), and self-referential cycles.
+   - Stable lexicographical topological sort with deterministic `(order_index, task_id)` tie-breaking.
+   - Missing dependency validation.
+   - Automatic blocked-task computation (tasks waiting on uncompleted predecessors).
+
+3. **Task Lifecycle State Machine (`src/repocontinuum/planning/state_machine.py`)**:
+   - Strict transition table enforcing valid forward progress.
+   - Prerequisite dependency gate: a blocked task cannot transition to `IN_PROGRESS` without all predecessors completing or an explicit waiver.
+
+4. **Obligation Ledger (`src/repocontinuum/planning/obligation_ledger.py`)**:
+   - Active acceptance criteria tracking.
+   - Superseding or withdrawing an obligation strictly requires a non-empty, explicit reason.
+   - **Critical Invariant:** A failed task NEVER silently removes an obligation; active obligations remain intact.
+
+5. **Persistence & Checkpointing (`src/repocontinuum/persistence/`)**:
+   - SQLAlchemy 2.x declarative models and atomic transaction management.
+   - Alembic migration `0001_initial_task_chain_schema.py`.
+   - Supports PostgreSQL canonical storage and isolated SQLite instances for unit tests.
+   - Process restart survival verified by integration test.
+
+6. **CLI Extension (`src/repocontinuum/cli.py`)**:
+   - `chain create`, `task-add`, `dep-add`, `validate`, `plan`, `status`, `obligations`, `checkpoint`, `resume`.

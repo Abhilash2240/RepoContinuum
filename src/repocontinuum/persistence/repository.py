@@ -39,6 +39,7 @@ from repocontinuum.domain.verification import (
 from repocontinuum.persistence.database import DatabaseManager
 from repocontinuum.persistence.tables import (
     AgentRunTable,
+    GitHubWebhookDeliveryTable,
     AuditEventTable,
     CheckpointTable,
     EvidenceReportTable,
@@ -617,3 +618,133 @@ class TaskChainRepository:
             created_at=r.created_at,
             completed_at=r.completed_at,
         )
+
+    # ---------------- Webhook Deliveries ----------------
+
+    def save_webhook_delivery(
+        self,
+        delivery_id: str,
+        event_type: str,
+        payload_hash: str,
+        action: Optional[str] = None,
+        status: str = "processed",
+    ) -> bool:
+        """Record a processed webhook delivery ID for idempotency."""
+        with self.db.session_scope() as session:
+            existing = session.scalar(
+                select(GitHubWebhookDeliveryTable).where(GitHubWebhookDeliveryTable.delivery_id == delivery_id)
+            )
+            if existing:
+                return False
+            now_utc = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            row = GitHubWebhookDeliveryTable(
+                id=f"dlv-{uuid.uuid4().hex[:12]}",
+                delivery_id=delivery_id,
+                event_type=event_type,
+                action=action,
+                payload_hash=payload_hash,
+                processed_at=now_utc,
+                status=status,
+            )
+            session.add(row)
+            return True
+
+    def is_delivery_processed(self, delivery_id: str) -> bool:
+        """Check if a webhook delivery has already been processed."""
+        with self.db.session_scope() as session:
+            existing = session.scalar(
+                select(GitHubWebhookDeliveryTable).where(GitHubWebhookDeliveryTable.delivery_id == delivery_id)
+            )
+            return existing is not None
+
+    # ---------------- Dashboard & Cross-Chain Queries ----------------
+
+    def list_all_tasks(self, limit: int = 100, offset: int = 0) -> List[MaintenanceTask]:
+        """List all maintenance tasks across all chains."""
+        with self.db.session_scope() as session:
+            stmt = select(MaintenanceTaskTable).order_by(MaintenanceTaskTable.order_index).offset(offset).limit(limit)
+            rows = session.scalars(stmt).all()
+            return [self._to_task_model(r) for r in rows]
+
+    def list_all_obligations(self, limit: int = 100, offset: int = 0) -> List[Obligation]:
+        """List all obligations across all chains."""
+        with self.db.session_scope() as session:
+            stmt = select(ObligationTable).order_by(ObligationTable.created_at.desc()).offset(offset).limit(limit)
+            rows = session.scalars(stmt).all()
+            return [self._to_obligation_model(r) for r in rows]
+
+    def list_all_agent_runs(self, limit: int = 50, offset: int = 0) -> List[AgentRun]:
+        """List recent agent runs across all tasks."""
+        with self.db.session_scope() as session:
+            stmt = select(AgentRunTable).order_by(AgentRunTable.created_at.desc()).offset(offset).limit(limit)
+            rows = session.scalars(stmt).all()
+            return [self._to_agent_run_model(r) for r in rows]
+
+    def list_all_verification_runs(self, limit: int = 50, offset: int = 0) -> List[VerificationRun]:
+        """List recent verification runs across all patches."""
+        with self.db.session_scope() as session:
+            stmt = select(VerificationRunTable).order_by(VerificationRunTable.started_at.desc()).offset(offset).limit(limit)
+            rows = session.scalars(stmt).all()
+            results = []
+            for record in rows:
+                checks = [VerificationCheck.model_validate(c) for c in (record.checks_json or [])]
+                rechecks = [ObligationRecheckResult.model_validate(o) for o in (record.obligation_rechecks_json or [])]
+                results.append(
+                    VerificationRun(
+                        id=record.id,
+                        patch_id=record.patch_id,
+                        task_id=record.task_id,
+                        chain_id=record.chain_id,
+                        base_sha=record.base_sha,
+                        workspace_id=record.workspace_id,
+                        sandbox_type=SandboxType(record.sandbox_type),
+                        image_tag=record.image_tag,
+                        image_digest=record.image_digest,
+                        started_at=record.started_at,
+                        completed_at=record.completed_at,
+                        status=VerificationRunStatus(record.status),
+                        checks=checks,
+                        obligation_rechecks=rechecks,
+                        has_regressions=record.has_regressions,
+                    )
+                )
+            return results
+
+    def get_dashboard_summary(self) -> Dict[str, Any]:
+        """Compute summary metrics across all persisted entities."""
+        with self.db.session_scope() as session:
+            chains = session.scalars(select(TaskChainTable)).all()
+            tasks = session.scalars(select(MaintenanceTaskTable)).all()
+            obligations = session.scalars(select(ObligationTable)).all()
+            agent_runs = session.scalars(select(AgentRunTable).order_by(AgentRunTable.created_at.desc()).limit(5)).all()
+            v_runs = session.scalars(select(VerificationRunTable).order_by(VerificationRunTable.started_at.desc()).limit(5)).all()
+
+            # Task status counts
+            task_status_counts: Dict[str, int] = {}
+            for t in tasks:
+                task_status_counts[t.status] = task_status_counts.get(t.status, 0) + 1
+
+            # Obligation status counts
+            active_obs = [o for o in obligations if o.status == ObligationStatus.ACTIVE.value]
+            superseded_obs = [o for o in obligations if o.status == ObligationStatus.SUPERSEDED.value]
+            withdrawn_obs = [o for o in obligations if o.status == ObligationStatus.WITHDRAWN.value]
+
+            # Repositories
+            repo_ids = sorted(list(set(c.repository_id for c in chains)))
+
+            # Regression warnings
+            regression_count = sum(1 for v in v_runs if v.has_regressions)
+
+            return {
+                "total_chains": len(chains),
+                "total_tasks": len(tasks),
+                "task_status_counts": task_status_counts,
+                "total_obligations": len(obligations),
+                "active_obligations": len(active_obs),
+                "superseded_obligations": len(superseded_obs),
+                "withdrawn_obligations": len(withdrawn_obs),
+                "recent_agent_runs_count": len(agent_runs),
+                "recent_verification_runs_count": len(v_runs),
+                "regressions_detected_recent": regression_count,
+                "registered_repositories": repo_ids,
+            }

@@ -2,7 +2,7 @@
 
 **Plan Version:** 1.0  
 **Baseline Date:** 21 November 2026  
-**Status:** Milestones 1, 2, and 3 Complete (Phase 0, Milestone 1, Milestone 2, Milestone 3 Complete)  
+**Status:** Milestones 1, 2, 3, 4, and 5 Complete (Phase 0, Milestone 1, Milestone 2, Milestone 3, Milestone 4, Milestone 5 Complete)  
 **Target Platform:** Windows / Python 3.13 (Docker Desktop/Linux containers for sandboxing)
 
 ---
@@ -27,7 +27,7 @@ RepoContinuum follows a strict milestone-driven, test-first, human-controlled de
 [Milestone 4: LLM Provider & Bounded Agent] ───> COMPLETE ◄─── DELIVERED
              │
              ▼
-[Milestone 5: Dashboard & GitHub Read Integration]
+[Milestone 5: Dashboard & GitHub Read Integration] ───> COMPLETE ◄─── DELIVERED
              │
              ▼
 [Milestone 6: Approved PR Publication & Benchmarking]
@@ -268,3 +268,60 @@ Deliver an isolated verification pipeline that safely parses, validates, and has
 - Security tests: `test_agent_security.py`.
 - Integration tests: `test_agent_workflow.py`.
 - CLI tests: `test_cli_agent.py`.
+
+---
+
+## 8. Phase 5 — Dashboard and GitHub Read Integration
+
+### Objectives
+- Build a local web dashboard exposing repository intelligence, task chains, DAG visualizer, obligation ledger, agent runs, verification evidence, and GitHub exploration.
+- Implement read-only GitHub App integration using RS256 JWT authentication and installation access token caching.
+- Enforce strict read-only boundary (zero write permissions, no PR creation, no branch pushes, no auto-merge).
+- Implement HMAC-SHA256 webhook signature verification and idempotency tracking with `X-GitHub-Delivery`.
+- Ingest external GitHub issues safely with `<UNTRUSTED_REPOSITORY_DATA>` boundary encapsulation.
+- Serve built React frontend directly from FastAPI with localhost loopback binding.
+
+### Completed Deliverables
+1. **GitHub App Read Module (`src/repocontinuum/github/`)**:
+   - `GitHubSettings` via Pydantic Settings (`REPOCONTINUUM_GITHUB_*`).
+   - `GitHubAppAuthManager`: RS256 JWT generation with 10-minute expiry; installation access token caching with 5-minute safety margin.
+   - Domain models: `GitHubUser`, `GitHubRepository`, `GitHubIssue`, `GitHubComment`, `GitHubPullRequest`, `GitHubInstallation`.
+   - Client implementations: `BaseGitHubClient` (abstract, strictly read-only), `LiveGitHubClient` (`httpx`), `FakeGitHubClient` (deterministic test double).
+   - `verify_webhook_signature`: HMAC-SHA256 constant-time comparison.
+   - `GitHubSyncService.import_issue_to_chain`: Imports issue and discussion thread safely wrapped in `<UNTRUSTED_REPOSITORY_DATA source="github_issue">` tags, setting task status to `CREATED` or `READY`.
+2. **Persistence & Alembic Migrations (`src/repocontinuum/persistence/`, `migrations/`)**:
+   - `GitHubWebhookDeliveryTable` for idempotency tracking.
+   - Query methods for aggregate dashboard statistics, all tasks, all obligations, all agent runs, all verification runs.
+   - Alembic migration `0004_github_integration_schema.py` verified with zero schema drift.
+3. **FastAPI Application & REST Endpoints (`src/repocontinuum/api/`)**:
+   - CORS middleware configured for localhost origins.
+   - Request correlation ID middleware (`X-Correlation-ID`).
+   - Routes:
+     - `GET /api/v1/dashboard/summary`: High-level aggregate metrics.
+     - `GET /api/v1/repositories`, `GET /api/v1/repositories/{id}/index`, `GET /api/v1/repositories/{id}/symbols`.
+     - `GET /api/v1/chains`, `GET /api/v1/chains/{id}`, `GET /api/v1/chains/{id}/graph`, `GET /api/v1/chains/{id}/obligations`.
+     - `POST /api/v1/chains/{id}/tasks/import-github-issue`.
+     - `GET /api/v1/agent-runs`, `GET /api/v1/agent-runs/{id}`.
+     - `GET /api/v1/verification-runs`, `GET /api/v1/verification-runs/{id}`, `GET /api/v1/verification-runs/{id}/evidence`.
+     - `GET /api/v1/github/status`, `GET /api/v1/github/installations`, `GET /api/v1/github/repositories`, `GET /api/v1/github/repositories/{owner}/{repo}/issues`, `GET /api/v1/github/repositories/{owner}/{repo}/pulls`.
+     - `POST /api/v1/webhooks/github`: HMAC signature verification and delivery idempotency.
+   - Static mounting: Serves built SPA bundle from `frontend/dist/` at root mount `/`.
+4. **React Single-Page Application (`frontend/`)**:
+   - Modern React 18, TypeScript, Vite, Lucide React.
+   - Dedicated views: `OverviewPage`, `RepositoriesPage`, `TaskChainsPage` (with DAG visualizer), `ObligationsPage`, `AgentRunsPage`, `VerificationViewerPage`, `GitHubExplorerPage`.
+   - Production bundle compiled with zero TypeScript errors.
+5. **CLI Dashboard Command (`src/repocontinuum/cli.py`)**:
+   - `repocontinuum dashboard run --host 127.0.0.1 --port 8000 [--reload]`.
+6. **Architecture Decision Record (`docs/adr/0004-dashboard-and-github-read-integration.md`)**:
+   - Formally documented dashboard architecture, read-only GitHub boundary, and webhook idempotency.
+
+### Test Suite (143 Passed, 2 Skipped, 0 Failed)
+- GitHub Auth Unit Tests: `tests/unit/test_github_auth.py`.
+- GitHub Client Unit Tests: `tests/unit/test_github_client.py`.
+- GitHub Webhook Unit Tests: `tests/unit/test_github_webhook.py`.
+- GitHub Sync Integration Tests: `tests/integration/test_github_sync.py`.
+- API Dashboard Tests: `tests/api/test_api_dashboard.py`.
+- API Chains & GitHub Tests: `tests/api/test_api_chains_and_github.py`.
+- API Agent & Verification Tests: `tests/api/test_api_agent_verification_runs.py`.
+- End-to-End Dashboard & API Tests: `tests/integration/test_dashboard_e2e.py`.
+

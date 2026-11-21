@@ -67,6 +67,13 @@ agent_app = typer.Typer(
 )
 app.add_typer(agent_app)
 
+dashboard_app = typer.Typer(
+    name="dashboard",
+    help="Launch the RepoContinuum local web dashboard and API server",
+    add_completion=False,
+)
+app.add_typer(dashboard_app)
+
 console = Console()
 
 
@@ -946,6 +953,18 @@ def agent_report(
     if agent_run.verification_run_id:
         console.print("\n[bold cyan]=== Verification Evidence ===[/bold cyan]")
         verify_report_cmd(agent_run.verification_run_id)
+
+
+@dashboard_app.command(name="run")
+def dashboard_run(
+    host: str = typer.Option("127.0.0.1", "--host", "-h", help="Bind host address (default: 127.0.0.1)."),
+    port: int = typer.Option(8000, "--port", "-p", help="Server port (default: 8000)."),
+    reload: bool = typer.Option(False, "--reload", help="Enable auto-reload for development."),
+) -> None:
+    """Launch the FastAPI dashboard backend server."""
+    import uvicorn
+    console.print(f"[bold green]Starting RepoContinuum Dashboard on http://{host}:{port}[/bold green]")
+    uvicorn.run("repocontinuum.api.app:app", host=host, port=port, reload=reload)
 
 
 if __name__ == "__main__":

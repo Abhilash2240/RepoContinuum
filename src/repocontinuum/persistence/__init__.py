@@ -4,6 +4,7 @@ from repocontinuum.persistence.database import Base, DatabaseManager
 from repocontinuum.persistence.repository import TaskChainRepository
 from repocontinuum.persistence.tables import (
     AgentRunTable,
+    GitHubWebhookDeliveryTable,
     AuditEventTable,
     CheckpointTable,
     EvidenceReportTable,

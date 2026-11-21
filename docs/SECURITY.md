@@ -76,6 +76,33 @@ Security in RepoContinuum is a core product capability, not a cosmetic post-impl
    - LLM API keys (`GEMINI_API_KEY`) are managed via Pydantic `SecretStr` inside `AgentSettings`. Secret values are masked in `__repr__`, logs, and terminal output.
    - The default test suite executes entirely offline using `FakeLLMProvider` without requiring live API keys or external network connectivity.
 
-## 6. Reporting Security Vulnerabilities
+## 6. Dashboard and GitHub Read Security (Milestone 5)
+
+1. **Strict Read-Only GitHub Boundary:**
+   - GitHub App credentials are used strictly for read access (`issues: read`, `pull_requests: read`, `metadata: read`).
+   - The application defines **zero write methods** for GitHub interactions. It cannot create branches, commit code, publish pull requests, or trigger auto-merge actions.
+   - Consequential remote repository mutations remain strictly blocked until Milestone 6.
+
+2. **Webhook HMAC-SHA256 Signature Verification:**
+   - All incoming webhook deliveries to `/api/v1/webhooks/github` are authenticated via the `X-Hub-Signature-256` header.
+   - Verification uses constant-time string comparison (`hmac.compare_digest`) to prevent timing side-channel attacks.
+   - Unauthenticated or forged webhook payloads are rejected immediately with HTTP 401 Unauthorized.
+
+3. **Webhook Delivery Idempotency and Replay Protection:**
+   - Every webhook delivery GUID (`X-GitHub-Delivery`) is logged in canonical database storage (`github_webhook_deliveries` table).
+   - Duplicate deliveries are detected and acknowledged with HTTP 200 `duplicate` status, preventing replay attacks or redundant task processing.
+
+4. **Untrusted Data Boundary Tags for External GitHub Issues:**
+   - External issue descriptions and discussion comments are treated as untrusted user input.
+   - When importing a GitHub issue into a task chain, content is enclosed in `<UNTRUSTED_REPOSITORY_DATA source="github_issue">` boundary tags to defend against prompt injection.
+
+5. **Local Network Loopback and Strict CORS:**
+   - The dashboard and API server bind strictly to `127.0.0.1` by default.
+   - Cross-Origin Resource Sharing (CORS) is restricted to explicit local origins (`http://127.0.0.1:5173`, `http://localhost:5173`, `http://127.0.0.1:8000`, `http://localhost:8000`).
+   - Public internet exposure without a secure reverse proxy is prohibited.
+
+---
+
+## 7. Reporting Security Vulnerabilities
 
 To report a vulnerability in RepoContinuum, submit a detailed report to the repository maintainer with reproduction steps. Do not open public issues for unpatched vulnerabilities.

@@ -4,7 +4,7 @@ RepoContinuum is a local-first, repository-aware software maintenance assistant 
 
 ---
 
-## Current Status: Milestones 1, 2, 3, and 4 Complete
+## Current Status: Milestones 1, 2, 3, 4, and 5 Complete
 
 - **Milestone 1 (Repository Intelligence Foundation):**
   - Walks repository files with strict path-traversal and symlink escape checks.
@@ -32,6 +32,22 @@ RepoContinuum is a local-first, repository-aware software maintenance assistant 
   - Disposable Linux container sandbox (`DockerSandboxRunner`) with `--network none`, `--read-only`, dropped capabilities, seccomp filters, and **fail-closed security** (never falls back to host execution when Docker is unavailable).
   - Regression gate re-verifying active obligations from earlier tasks, detecting broken invariants (`REGRESSION_DETECTED`), and honestly reporting inconclusive verifiers (`INCONCLUSIVE`).
   - Full provenance and evidence reporting stored in database and rendered in formatted Markdown.
+
+- **Milestone 4 (LLM Provider Integration & Bounded Agent):**
+  - Provider-agnostic LLM interface with Google Gemini (`google-genai` SDK) and deterministic `FakeLLMProvider`.
+  - Strongly-typed Pydantic schemas (`IssueAnalysis`, `TaskPlan`, `PatchProposal`, `ToolIntent`).
+  - Context builder with prompt-injection defense via `<UNTRUSTED_REPOSITORY_DATA>` boundary encapsulation.
+  - Bounded read-only tool dispatcher with closed allowlist, traversal guards, sensitive file blocking, and call budgets.
+  - Mandatory human-in-the-loop plan approval gate before patch proposal and verification.
+  - Bounded repair loop with automated regression feedback and budget limit protection (`BUDGET_EXHAUSTED`).
+
+- **Milestone 5 (Dashboard & GitHub Read Integration):**
+  - Local-first web dashboard (React 18, TypeScript, Vite, Lucide React) served directly by FastAPI at `127.0.0.1:8000`.
+  - Rich views for Overview metrics, Repository Explorer, Task Chain & DAG Visualizer, Obligation Ledger, Agent Telemetry, and Verification Evidence.
+  - Strict read-only GitHub App integration (RS256 JWT, cached installation tokens, zero write methods).
+  - HMAC-SHA256 webhook signature verification (`X-Hub-Signature-256`) with `hmac.compare_digest`.
+  - Webhook delivery idempotency with `X-GitHub-Delivery` tracking in database.
+  - Safe import of GitHub issues into task chains wrapped in `<UNTRUSTED_REPOSITORY_DATA source="github_issue">` boundary tags.
 
 ---
 
@@ -218,3 +234,27 @@ python -m repocontinuum.cli agent verify --task <task_id> --run <run_id> --repo 
 python -m repocontinuum.cli agent status --run <run_id>
 python -m repocontinuum.cli agent report --run <run_id>
 ```
+
+---
+
+## Web Dashboard & GitHub Integration (Milestone 5)
+
+Launch the integrated local web dashboard and API server:
+
+```powershell
+# Launch dashboard on default loopback (127.0.0.1:8000)
+repocontinuum dashboard run
+
+# Or specify custom host, port, or development auto-reload
+repocontinuum dashboard run --host 127.0.0.1 --port 8000 --reload
+```
+
+Once started, open [http://127.0.0.1:8000](http://127.0.0.1:8000) in your browser to access:
+- **Operations Center Overview:** Metric cards, task distributions, obligation breakdown, recent runs, regression alerts.
+- **Repository Explorer:** File tree navigation, AST symbol search with docstrings, signatures, and locations.
+- **Task Chains & DAG Visualizer:** Interactive dependency graph with cycle-free topological order visualization.
+- **Obligation Ledger:** Active vs superseded vs withdrawn requirements ledger.
+- **Agent Telemetry:** Step-by-step LLM run traces, prompt/completion token usage, and latency.
+- **Verification Evidence Viewer:** Test check outcomes, pass/fail results, and formatted Markdown reports.
+- **GitHub Read Explorer:** Read-only access to GitHub App installations, repositories, issues, and pull requests, with safe one-click import into task chains.
+

@@ -232,3 +232,16 @@ class AgentRunTable(Base):
     patch_proposal_json: Mapped[Dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[str] = mapped_column(String(64), nullable=False)
     completed_at: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+class GitHubWebhookDeliveryTable(Base):
+    """Track processed GitHub webhook delivery IDs for idempotency and auditing."""
+    __tablename__ = "github_webhook_deliveries"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    delivery_id: Mapped[str] = mapped_column(String(128), unique=True, nullable=False, index=True)
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    action: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    processed_at: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="processed", nullable=False)

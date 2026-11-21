@@ -57,6 +57,11 @@ coverage.xml
 *.pem
 *.key
 
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
 # IDE & Editor files
 .idea/
 .vscode/

@@ -4,7 +4,7 @@ RepoContinuum is a local-first, repository-aware software maintenance assistant 
 
 ---
 
-## Current Status: Milestone 1 & Milestone 2 Complete
+## Current Status: Milestones 1, 2, and 3 Complete
 
 - **Milestone 1 (Repository Intelligence Foundation):**
   - Walks repository files with strict path-traversal and symlink escape checks.
@@ -23,6 +23,15 @@ RepoContinuum is a local-first, repository-aware software maintenance assistant 
   - Obligation ledger maintains acceptance criteria across tasks (`active`, `superseded`, `withdrawn`), strictly preserving obligations when tasks fail.
   - Atomic persistence with SQLAlchemy 2.x and Alembic migrations, with durable checkpoints surviving full process restarts.
   - Complete CLI commands for task chain authoring, dependency linking, DAG planning, and resumption.
+
+- **Milestone 3 (Patch Generation and Isolated Verification):**
+  - Strict unified diff parser extracting changed files, hunk geometries, additions, and removals with SHA-256 integrity hash verification.
+  - Path traversal and security validator rejecting `../`, absolute paths, Windows drive paths, duplicate targets, and sensitive/credential files (`.git`, `.env*`, `.github*`, keys/certs).
+  - Isolated disposable working-copy manager provisioning clean source trees at exact base commit SHAs without dirtying the host workspace.
+  - Strict command execution allowlist (`py_compile`, `pytest`, `ruff`) with secret redaction (JWT, API keys, private keys) and zero `shell=True` execution.
+  - Disposable Linux container sandbox (`DockerSandboxRunner`) with `--network none`, `--read-only`, dropped capabilities, seccomp filters, and **fail-closed security** (never falls back to host execution when Docker is unavailable).
+  - Regression gate re-verifying active obligations from earlier tasks, detecting broken invariants (`REGRESSION_DETECTED`), and honestly reporting inconclusive verifiers (`INCONCLUSIVE`).
+  - Full provenance and evidence reporting stored in database and rendered in formatted Markdown.
 
 ---
 
@@ -91,6 +100,7 @@ For full architecture and design decisions, see:
 - [Implementation Plan](file:///docs/IMPLEMENTATION_PLAN.md)
 - [Security Policy](file:///docs/SECURITY.md)
 - [ADR 0001: Indexer Architecture](file:///docs/adr/0001-indexer-architecture.md)
+- [ADR 0002: Sandbox & Verification Architecture](file:///docs/adr/0002-sandbox-and-verification-architecture.md)
 
 
 ---
@@ -141,6 +151,38 @@ repocontinuum chain checkpoint --chain chn-abc123def456
 
 # Resume from durable state
 repocontinuum chain resume --chain chn-abc123def456
+```
+
+---
+
+## Patch & Verification CLI Commands (Milestone 3)
+
+### 1. Validate a Unified Diff File
+Inspect syntax, line counts, and path security without applying or executing code:
+```powershell
+repocontinuum patch validate --diff path/to/feature.patch
+```
+
+### 2. Propose a Patch for a Maintenance Task
+Cryptographically bind a patch to a task and exact base commit SHA:
+```powershell
+repocontinuum patch propose --task tsk-111111111111 --diff path/to/feature.patch --base-sha a1b2c3d4e5f6...
+```
+
+### 3. Run Isolated Verification and Regression Checking
+Execute tests in a disposable Linux container (or simulated test double) and re-verify earlier obligations:
+```powershell
+# Production isolated verification (fails closed if Docker is unavailable)
+repocontinuum verify run --task tsk-111111111111 --patch pat-999999999999 --repo ./my-service
+
+# Verification using high-speed deterministic test double (for testing without Docker)
+repocontinuum verify run --task tsk-111111111111 --patch pat-999999999999 --repo ./my-service --fake-sandbox
+```
+
+### 4. Inspect Verification Evidence Report
+Query and render full evidence, executed checks, earlier obligation results, and regression alerts:
+```powershell
+repocontinuum verify report --run vrun-123456789abc
 ```
 
 ---

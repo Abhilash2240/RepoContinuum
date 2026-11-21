@@ -2,14 +2,14 @@
 
 **Plan Version:** 1.0  
 **Baseline Date:** 21 November 2026  
-**Status:** In Progress (Phase 0 & Milestone 1 Active)  
-**Target Platform:** Windows / Python 3.13 (Docker Desktop/WSL2 for sandboxing in Milestone 3)
+**Status:** Milestones 1, 2, and 3 Complete (Phase 0, Milestone 1, Milestone 2, Milestone 3 Complete)  
+**Target Platform:** Windows / Python 3.13 (Docker Desktop/Linux containers for sandboxing)
 
 ---
 
 ## 1. Plan Overview and Phasing Strategy
 
-RepoContinuum follows a strict milestone-driven, test-first, human-controlled delivery methodology. Features are implemented sequentially in bounded vertical slices. No milestone proceeds until the preceding milestone meets its complete Definition of Done, including unit, integration, and security tests.
+RepoContinuum follows a strict milestone-driven, test-first, human-controlled delivery methodology. Features are implemented sequentially in bounded vertical slices across exactly six milestones. No milestone proceeds until the preceding milestone meets its complete Definition of Done, including unit, integration, and security tests.
 
 ```text
 [Phase 0: Environment & Scaffold]  ──> COMPLETE
@@ -18,10 +18,10 @@ RepoContinuum follows a strict milestone-driven, test-first, human-controlled de
 [Milestone 1: Repository Intelligence Foundation] ──> COMPLETE
              │
              ▼
-[Milestone 2: Task Chains & Obligation Ledger] ──> COMPLETE ◄── CURRENT FOCUS
+[Milestone 2: Task Chains & Obligation Ledger] ──> COMPLETE
              │
              ▼
-[Milestone 3: Patch & Isolated Verification Loop]
+[Milestone 3: Patch & Isolated Verification Loop] ──> COMPLETE ◄── DELIVERED
              │
              ▼
 [Milestone 4: LLM Provider & Bounded Agent]
@@ -169,3 +169,54 @@ Deliver a stateful, dependency-aware task chain orchestrator that models depende
 
 6. **CLI Extension (`src/repocontinuum/cli.py`)**:
    - `chain create`, `task-add`, `dep-add`, `validate`, `plan`, `status`, `obligations`, `checkpoint`, `resume`.
+
+---
+
+## 6. Milestone 3 — Patch Generation and Isolated Verification
+
+### Goal
+Deliver an isolated verification pipeline that safely parses, validates, and hashes unified diff patches, provisions clean disposable workspaces at exact base commits, enforces strict command execution allowlists and secret redactions, runs tests inside locked-down disposable Linux containers (or simulated test doubles), re-verifies earlier active obligations to detect cascading regressions, and outputs auditable evidence reports with honest conclusion reporting.
+
+### Key Components Delivered
+1. **Unified Diff Parser & Applier (`src/repocontinuum/patching/`)**:
+   - `UnifiedDiffParser`: Validates patch syntax, parses multi-file hunks, tracks line additions and removals, rejects malformed diffs and binary patches, and computes SHA-256 integrity hash.
+   - `PatchSecurityValidator`: Enforces strict path security, rejecting path traversal (`../`, `..\`), absolute paths, Windows drive letters (`C:`), duplicate targets, and protected paths (`.git/**`, `.env*`, `*.pem`, `*.key`, `id_rsa*`, `.github/**`).
+   - `UnifiedDiffApplier`: Pure-Python diff applier for new file creations, file deletions, and hunk modifications with exact line offset and context matching.
+
+2. **Disposable Workspace Manager (`src/repocontinuum/execution/workspace.py`)**:
+   - Clones/copies the repository tree to a secure temporary workspace at the exact base commit SHA.
+   - Strictly excludes `.git` and `.env*` files to isolate the host working copy and host credentials.
+   - Validates that target repository base SHA matches patch expectation.
+   - Provides safe deterministic workspace cleanup via context manager and exception handlers.
+
+3. **Command Allowlist & Secret Redaction (`src/repocontinuum/execution/allowlist.py`)**:
+   - `CommandAllowlistValidator`: Validates structured command argument arrays against explicit profiles (`python -m py_compile`, `python -m pytest`, `python -m ruff`).
+   - Strictly prohibits shell strings, command substitutions (`$()`), chaining operators (`&&`, `||`, `;`), pipes, and wildcards. Subprocess execution never uses `shell=True`.
+   - `SecretRedactor`: Actively redacts JWTs, Bearer tokens, private keys, AWS keys, and generic API keys from execution logs before persistence and display.
+
+4. **Container Sandbox Runners (`src/repocontinuum/execution/sandbox.py`)**:
+   - `DockerSandboxRunner`: Disposable Linux container execution (`python:3.13-slim`) with `--network none`, `--read-only`, dropped capabilities (`--cap-drop ALL`), default seccomp filter, CPU limits, memory limits, and wall-clock execution timeouts.
+   - **Fail-Closed Security Guarantee:** When Docker daemon is stopped or unreachable, the runner reports `NOT_RUN` and strictly refuses host fallback.
+   - `FakeSandboxRunner`: Deterministic, high-speed test double for unit and integration testing without requiring a live Docker daemon.
+
+5. **Verification Engine & Regression Gates (`src/repocontinuum/verification/engine.py`)**:
+   - Coordinates patch parsing, path validation, disposable workspace creation, diff application, and primary sandbox checks.
+   - **Regression Gate:** Re-evaluates active acceptance obligations established by prior tasks in the chain. If a patch breaks an earlier obligation, flags `status=REGRESSION_DETECTED` and `conclusion=FAILED`.
+   - Lacking executable verifiers are reported honestly as `INCONCLUSIVE` rather than fabricating success.
+   - Emits structured `EvidenceReport` and human-readable Markdown summaries.
+
+6. **Persistence & Alembic Migrations (`src/repocontinuum/persistence/`)**:
+   - Added `PatchTable`, `VerificationRunTable`, and `EvidenceReportTable`.
+   - Alembic migration `0002_patch_and_verification_schema.py`.
+   - Query and storage APIs for patches, verification runs, and evidence reports by report ID or verification run ID.
+
+7. **Typer CLI Verification Commands (`src/repocontinuum/cli.py`)**:
+   - `repocontinuum patch validate --diff <patch_file>`
+   - `repocontinuum patch propose --task <task_id> --diff <patch_file> --base-sha <sha>`
+   - `repocontinuum verify run --task <task_id> --patch <patch_id> --repo <repo_path> [--fake-sandbox]`
+   - `repocontinuum verify report --run <run_id>`
+
+### Test Suite (91 Passed, 1 Skipped, 0 Failed)
+- Unit tests: `test_diff_parser.py`, `test_patch_security.py`, `test_allowlist_and_secrets.py`, `test_sandbox.py`.
+- Integration tests: `test_disposable_workspace.py`, `test_patch_applier.py`, `test_verification_engine.py`.
+- CLI tests: `test_cli_patch_verify.py`.

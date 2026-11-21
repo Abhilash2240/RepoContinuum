@@ -1,9 +1,10 @@
-"""SQLAlchemy ORM tables for task chains, dependencies, obligations, checkpoints, and audits."""
+"""SQLAlchemy ORM tables for task chains, dependencies, obligations, checkpoints, patches, and verification."""
 
 from __future__ import annotations
 
 from typing import Any, Dict, List
 from sqlalchemy import (
+    Boolean,
     ForeignKey,
     Integer,
     JSON,
@@ -74,6 +75,7 @@ class MaintenanceTaskTable(Base):
     updated_at: Mapped[str] = mapped_column(String(64), nullable=False)
 
     chain: Mapped[TaskChainTable] = relationship("TaskChainTable", back_populates="tasks")
+    patches: Mapped[List[PatchTable]] = relationship("PatchTable", back_populates="task", cascade="all, delete-orphan")
 
 
 class TaskDependencyTable(Base):
@@ -138,3 +140,60 @@ class AuditEventTable(Base):
     occurred_at: Mapped[str] = mapped_column(String(64), nullable=False)
 
     chain: Mapped[TaskChainTable] = relationship("TaskChainTable", back_populates="audit_events")
+
+
+class PatchTable(Base):
+    """Durable record of a validated patch bound to a base commit SHA and hash."""
+    __tablename__ = "patches"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    repository_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    task_id: Mapped[str] = mapped_column(String(64), ForeignKey("maintenance_tasks.id", ondelete="CASCADE"), nullable=False)
+    base_sha: Mapped[str] = mapped_column(String(64), nullable=False)
+    patch_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    diff_content: Mapped[str] = mapped_column(Text, nullable=False)
+    changed_paths: Mapped[List[str]] = mapped_column(JSON, default=list, nullable=False)
+    total_added_lines: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    total_removed_lines: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[str] = mapped_column(String(64), nullable=False)
+
+    task: Mapped[MaintenanceTaskTable] = relationship("MaintenanceTaskTable", back_populates="patches")
+    verification_runs: Mapped[List[VerificationRunTable]] = relationship("VerificationRunTable", back_populates="patch", cascade="all, delete-orphan")
+
+
+class VerificationRunTable(Base):
+    """Durable record of an isolated verification execution run."""
+    __tablename__ = "verification_runs"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    patch_id: Mapped[str] = mapped_column(String(64), ForeignKey("patches.id", ondelete="CASCADE"), nullable=False)
+    task_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    chain_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    base_sha: Mapped[str] = mapped_column(String(64), nullable=False)
+    workspace_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    sandbox_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    image_tag: Mapped[str] = mapped_column(String(128), nullable=False)
+    image_digest: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    started_at: Mapped[str] = mapped_column(String(64), nullable=False)
+    completed_at: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    checks_json: Mapped[List[Dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
+    obligation_rechecks_json: Mapped[List[Dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
+    has_regressions: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    patch: Mapped[PatchTable] = relationship("PatchTable", back_populates="verification_runs")
+    evidence_report: Mapped[EvidenceReportTable | None] = relationship("EvidenceReportTable", back_populates="verification_run", uselist=False, cascade="all, delete-orphan")
+
+
+class EvidenceReportTable(Base):
+    """Persisted structured evidence report and markdown summary."""
+    __tablename__ = "evidence_reports"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    verification_run_id: Mapped[str] = mapped_column(String(64), ForeignKey("verification_runs.id", ondelete="CASCADE"), nullable=False)
+    report_json: Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False)
+    summary_markdown: Mapped[str] = mapped_column(Text, nullable=False)
+    generated_at: Mapped[str] = mapped_column(String(64), nullable=False)
+
+    verification_run: Mapped[VerificationRunTable] = relationship("VerificationRunTable", back_populates="evidence_report")

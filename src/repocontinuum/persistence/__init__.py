@@ -5,10 +5,13 @@ from repocontinuum.persistence.repository import TaskChainRepository
 from repocontinuum.persistence.tables import (
     AuditEventTable,
     CheckpointTable,
+    EvidenceReportTable,
     MaintenanceTaskTable,
     ObligationTable,
+    PatchTable,
     TaskChainTable,
     TaskDependencyTable,
+    VerificationRunTable,
 )
 
 __all__ = [
@@ -16,9 +19,12 @@ __all__ = [
     "Base",
     "CheckpointTable",
     "DatabaseManager",
+    "EvidenceReportTable",
     "MaintenanceTaskTable",
     "ObligationTable",
+    "PatchTable",
     "TaskChainRepository",
     "TaskChainTable",
     "TaskDependencyTable",
+    "VerificationRunTable",
 ]

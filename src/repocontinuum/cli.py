@@ -15,7 +15,11 @@ from repocontinuum import __version__
 from repocontinuum.config import IndexerSettings
 from repocontinuum.domain.models import ParseStatus, RepositorySnapshot
 from repocontinuum.domain.planning import ObligationStatus, TaskStatus
+from repocontinuum.domain.verification import CheckStatus, VerificationRunStatus
+from repocontinuum.execution.sandbox import DockerSandboxRunner, FakeSandboxRunner
 from repocontinuum.indexing.indexer import RepositoryIndexer
+from repocontinuum.patching.diff_parser import UnifiedDiffParser
+from repocontinuum.patching.security import PatchSecurityValidator
 from repocontinuum.persistence.database import DatabaseManager
 from repocontinuum.persistence.repository import TaskChainRepository
 from repocontinuum.planning.service import TaskChainService
@@ -39,6 +43,20 @@ chain_app = typer.Typer(
     add_completion=False,
 )
 app.add_typer(chain_app)
+
+patch_app = typer.Typer(
+    name="patch",
+    help="Unified diff proposal and path security validation",
+    add_completion=False,
+)
+app.add_typer(patch_app)
+
+verify_app = typer.Typer(
+    name="verify",
+    help="Isolated verification execution and evidence reporting",
+    add_completion=False,
+)
+app.add_typer(verify_app)
 
 console = Console()
 
@@ -456,6 +474,213 @@ def chain_resume(
     except Exception as e:
         console.print(f"[bold red]Failed to resume chain:[/bold red] {e}")
         raise typer.Exit(code=1)
+
+
+# ================= Patch Commands =================
+
+@patch_app.command(name="validate")
+def patch_validate(
+    diff_file: Path = typer.Option(
+        ...,
+        "--diff",
+        "-d",
+        help="Path to unified diff file",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True,
+    ),
+) -> None:
+    """Validate unified diff syntax and security boundaries."""
+    try:
+        content = diff_file.read_text(encoding="utf-8")
+        file_diffs = UnifiedDiffParser.parse(content)
+        changed_paths = PatchSecurityValidator.validate_patch_security(file_diffs)
+        patch_hash = UnifiedDiffParser.compute_patch_hash(content)
+
+        table = Table(title=f"Patch Validation — {diff_file.name}", show_lines=True)
+        table.add_column("File Target", style="cyan")
+        table.add_column("Type")
+        table.add_column("Hunks", justify="right")
+        table.add_column("Added", justify="right", style="green")
+        table.add_column("Removed", justify="right", style="red")
+
+        for fd in file_diffs:
+            change_type = "Created" if fd.is_creation else ("Deleted" if fd.is_deletion else "Modified")
+            target = fd.new_path if not fd.is_deletion else fd.old_path
+            table.add_row(
+                target,
+                change_type,
+                str(len(fd.hunks)),
+                f"+{fd.added_lines}",
+                f"-{fd.removed_lines}",
+            )
+
+        console.print(table)
+        console.print(f"[bold green]✓ Valid Patch:[/bold green] SHA-256 = `{patch_hash}` ({len(changed_paths)} files changed)")
+    except Exception as e:
+        console.print(f"[bold red]Patch validation failed:[/bold red] {e}")
+        raise typer.Exit(code=1)
+
+
+@patch_app.command(name="propose")
+def patch_propose(
+    task_id: str = typer.Option(..., "--task", "-t", help="Target task ID"),
+    diff_file: Path = typer.Option(
+        ...,
+        "--diff",
+        "-d",
+        help="Path to unified diff file",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True,
+    ),
+    base_sha: str = typer.Option(..., "--base-sha", "-b", help="Exact base commit SHA"),
+) -> None:
+    """Validate, hash, and register a patch proposal for a task."""
+    service = _get_service()
+    try:
+        content = diff_file.read_text(encoding="utf-8")
+        patch = service.propose_patch(task_id=task_id, diff_content=content, base_sha=base_sha)
+        console.print(
+            f"[bold green]✓[/bold green] Registered patch [bold cyan]{patch.id}[/bold cyan] "
+            f"bound to task [bold]{task_id}[/bold] and base [dim]{patch.base_sha[:10]}...[/dim] "
+            f"(Hash: [yellow]{patch.patch_hash[:16]}...[/yellow])"
+        )
+    except Exception as e:
+        console.print(f"[bold red]Failed to propose patch:[/bold red] {e}")
+        raise typer.Exit(code=1)
+
+
+# ================= Verification Commands =================
+
+@verify_app.command(name="run")
+def verify_run_cmd(
+    task_id: str = typer.Option(..., "--task", "-t", help="Task ID being verified"),
+    patch_id: str = typer.Option(..., "--patch", "-p", help="Patch ID to verify"),
+    repo_path: Path = typer.Option(
+        Path("."),
+        "--repo",
+        "-r",
+        help="Path to repository root",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        resolve_path=True,
+    ),
+    fake_sandbox: bool = typer.Option(
+        False,
+        "--fake-sandbox",
+        help="Use deterministic fake sandbox runner for local testing",
+    ),
+) -> None:
+    """Execute isolated patch verification and obligation re-checking."""
+    service = _get_service()
+    runner = FakeSandboxRunner() if fake_sandbox else DockerSandboxRunner()
+
+    with console.status("[bold blue]Executing isolated verification pipeline...[/bold blue]"):
+        try:
+            vrun, report = service.verify_patch(
+                task_id=task_id,
+                patch_id=patch_id,
+                repo_path=repo_path,
+                sandbox_runner=runner,
+            )
+        except Exception as e:
+            console.print(f"[bold red]Verification execution failed:[/bold red] {e}")
+            raise typer.Exit(code=1)
+
+    _display_verification_report(vrun, report)
+
+
+@verify_app.command(name="report")
+def verify_report_cmd(
+    run_id: str = typer.Option(..., "--run", help="Verification run ID"),
+) -> None:
+    """Display the full evidence report for a verification run."""
+    service = _get_service()
+    try:
+        vrun = service.get_verification_run(run_id)
+        if not vrun:
+            console.print(f"[bold red]Verification run '{run_id}' not found.[/bold red]")
+            raise typer.Exit(code=1)
+
+        report = service.get_evidence_report(run_id)
+        if not report:
+            console.print(f"[bold red]Evidence report for run '{run_id}' not found.[/bold red]")
+            raise typer.Exit(code=1)
+
+        _display_verification_report(vrun, report)
+    except typer.Exit:
+        raise
+    except Exception as e:
+        console.print(f"[bold red]Failed to load report:[/bold red] {e}")
+        raise typer.Exit(code=1)
+
+
+def _display_verification_report(vrun: VerificationRun, report: EvidenceReport) -> None:
+    """Render formatted verification report table and evidence summary."""
+    status_color = "green" if report.verification_conclusion == CheckStatus.PASSED else "red"
+    header = Table(show_header=False, box=None)
+    header.add_row("[bold]Verification Run:[/bold]", vrun.id)
+    header.add_row("[bold]Task ID:[/bold]", report.task_id)
+    header.add_row("[bold]Base Commit SHA:[/bold]", report.base_sha)
+    header.add_row("[bold]Patch Hash:[/bold]", report.patch_hash[:16] + "...")
+    header.add_row("[bold]Sandbox Runner:[/bold]", f"{vrun.sandbox_type.value} ({vrun.image_tag})")
+    header.add_row("[bold]Conclusion:[/bold]", f"[{status_color}]{report.verification_conclusion.value}[/{status_color}]")
+
+    console.print(
+        Panel(
+            header,
+            title="[bold cyan]RepoContinuum — Verification Evidence Report[/bold cyan]",
+            border_style="cyan",
+        )
+    )
+
+    # Checks table
+    checks_table = Table(title="Executed Checks", show_lines=True)
+    checks_table.add_column("Check Name", style="bold")
+    checks_table.add_column("Status")
+    checks_table.add_column("Exit Code", justify="right")
+    checks_table.add_column("Duration", justify="right")
+    checks_table.add_column("Message")
+
+    for chk in report.checks_executed:
+        chk_color = "green" if chk.status == CheckStatus.PASSED else "red"
+        checks_table.add_row(
+            chk.name,
+            f"[{chk_color}]{chk.status.value}[/{chk_color}]",
+            str(chk.exit_code if chk.exit_code is not None else "-"),
+            f"{chk.duration_ms}ms",
+            chk.message,
+        )
+    console.print(checks_table)
+
+    # Earlier obligations rechecked
+    if report.earlier_obligations_rechecked:
+        ob_table = Table(title="Earlier Obligations Re-verified", show_lines=True)
+        ob_table.add_column("Obligation ID", style="cyan")
+        ob_table.add_column("Description")
+        ob_table.add_column("Verifier Ref", style="dim")
+        ob_table.add_column("Result")
+
+        for o in report.earlier_obligations_rechecked:
+            if o.is_regression:
+                res_str = "[bold red]REGRESSION DETECTED[/bold red]"
+            elif o.status == CheckStatus.PASSED:
+                res_str = "[green]PASSED[/green]"
+            else:
+                res_str = f"[yellow]{o.status.value}[/yellow]"
+            ob_table.add_row(o.obligation_id, o.description, o.verifier_ref or "-", res_str)
+
+        console.print(ob_table)
+
+    # Regressions alert
+    if report.regressions_detected:
+        console.print("\n[bold red]⚠️ REGRESSIONS DETECTED:[/bold red]")
+        for reg in report.regressions_detected:
+            console.print(f" • [red]{reg}[/red]")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # RepoContinuum — Security Policy and Architecture
 
-**Version:** 1.0  
+**Version:** 1.2  
 **Effective Date:** 21 November 2026
 
 ---
@@ -20,9 +20,13 @@ Security in RepoContinuum is a core product capability, not a cosmetic post-impl
 | **Repository File Indexing** | Code execution during parsing (e.g. `importlib`, `exec`, `eval`) | Static AST parsing via standard library `ast.parse` only. Target repository code is **never imported or executed** on the host. |
 | **Filesystem Access** | Path traversal (`../`), symlink escapes, arbitrary file disclosure | Strict canonical path validation (`Path.resolve()`). Inspected files must be strictly subordinate to the repository root. Symlinks escaping root are logged and skipped. |
 | **Protected Files** | Modifying sensitive system files or credentials | Explicit protection of `.git`, `.env*`, SSH keys, cloud credentials, and CI workflows. |
-| **Patch Validation** | Hostile diffs modifying files outside repository boundaries | Patches must be validated for path traversal, absolute paths, and restricted paths before application. |
-| **Test Verification (Milestone 3+)** | Hostile setup or test scripts executing malicious payloads | Execution confined to disposable Linux containers (Docker/WSL2). No host credential mounting, no Docker socket mount, default seccomp profile, dropped capabilities, memory/CPU/PID/time limits, and no network access by default. |
-| **Prompt Injection (Milestone 4+)** | Adversarial comments or docstrings altering LLM behavior | Model output is treated as untrusted input. Tool execution is strictly governed by application allowlists, never by model commands. |
+| **Patch Ingestion & Parsing** | Malformed diffs, path traversal, host file overwrites | Strict unified diff parser validating hunk geometry, headers, and computing SHA-256 integrity hash. All target paths inspected against path traversal, Windows drive letters, and protected paths. |
+| **Workspace Isolation** | Corrupting user's active branch or unstaged working tree | Disposable working copies created in temporary directories at the exact base commit SHA, strictly excluding `.git` and `.env*`. Host repository is never modified during verification. |
+| **Verification Execution** | Hostile setup or test scripts executing malicious payloads | Strict command allowlist (`python -m py_compile`, `python -m pytest`, `python -m ruff`). Subprocess invocation strictly uses argument arrays without `shell=True`. |
+| **Sandbox Execution** | Container breakout, network exfiltration, resource exhaustion | Disposable Linux containers with `--network none`, `--read-only`, dropped capabilities (`--cap-drop ALL`), seccomp filter, memory/CPU limits, and timeout enforcement. |
+| **Sandbox Availability** | Host fallback when Docker daemon is stopped | **Fail-Closed Guarantee:** Verification immediately returns `NOT_RUN` / `FAILED` if the container engine is unavailable. It strictly **never falls back to host execution**. |
+| **Regression Prevention** | Undetected breaking changes to earlier tasks in chain | Re-runs active acceptance obligations established by earlier tasks. Flags regressions as `REGRESSION_DETECTED`. Lacking verifiers reported honestly as `INCONCLUSIVE`. |
+| **Credential Redaction** | Secret leakage in logs, audit records, or reports | Active redaction of JWTs, bearer tokens, private keys, AWS keys, and generic API keys across stdout and stderr. |
 | **Consequential Remote Actions** | Unauthorized commits, PR creations, or deployments | Human-in-the-loop gate required for all remote GitHub writes. No auto-merge or auto-deploy. |
 
 ---
@@ -35,6 +39,15 @@ Security in RepoContinuum is a core product capability, not a cosmetic post-impl
 
 ---
 
-## 4. Reporting Security Vulnerabilities
+## 4. Patch & Verification Invariants (Milestone 3)
+
+1. **Patch Integrity Binding:** Every patch is cryptographically bound to its Repository ID, Task ID, Base Commit SHA, and SHA-256 Patch Content Hash.
+2. **No Host Code Execution:** Repository test execution must occur within an isolated container environment or simulated test double. Repository test suites are never executed directly on the host OS.
+3. **Fail-Closed Container Engine:** If Docker Desktop is stopped or unreachable, the system records `status=NOT_RUN` and halts verification. Host execution is strictly forbidden.
+4. **Active Obligation Preservation:** Obligations from failed tasks are never silently removed. Regression checks against earlier active obligations prevent cascading silent failures.
+
+---
+
+## 5. Reporting Security Vulnerabilities
 
 To report a vulnerability in RepoContinuum, submit a detailed report to the repository maintainer with reproduction steps. Do not open public issues for unpatched vulnerabilities.

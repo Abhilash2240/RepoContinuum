@@ -1,4 +1,4 @@
-"""Repository pattern implementation for durable persistence of task chains."""
+"""Repository pattern implementation for durable persistence of task chains, patches, and verification."""
 
 from __future__ import annotations
 
@@ -21,19 +21,33 @@ from repocontinuum.domain.planning import (
     TaskDependency,
     TaskStatus,
 )
+from repocontinuum.domain.verification import (
+    CheckStatus,
+    EvidenceReport,
+    ObligationRecheckResult,
+    Patch,
+    PatchStatus,
+    SandboxType,
+    VerificationCheck,
+    VerificationRun,
+    VerificationRunStatus,
+)
 from repocontinuum.persistence.database import DatabaseManager
 from repocontinuum.persistence.tables import (
     AuditEventTable,
     CheckpointTable,
+    EvidenceReportTable,
     MaintenanceTaskTable,
     ObligationTable,
+    PatchTable,
     TaskChainTable,
     TaskDependencyTable,
+    VerificationRunTable,
 )
 
 
 class TaskChainRepository:
-    """Provides atomic query and mutation methods for the task chain domain."""
+    """Provides atomic query and mutation methods for the task chain and verification domain."""
 
     def __init__(self, db_manager: DatabaseManager):
         self.db = db_manager
@@ -235,6 +249,128 @@ class TaskChainRepository:
             records = session.scalars(stmt).all()
             return [self._to_obligation_model(r) for r in records]
 
+    # ---------------- Patches ----------------
+
+    def save_patch(self, patch: Patch) -> Patch:
+        """Create or update a patch record."""
+        with self.db.session_scope() as session:
+            existing = session.get(PatchTable, patch.id)
+            if existing:
+                existing.status = patch.status.value
+            else:
+                record = PatchTable(
+                    id=patch.id,
+                    repository_id=patch.repository_id,
+                    task_id=patch.task_id,
+                    base_sha=patch.base_sha,
+                    patch_hash=patch.patch_hash,
+                    diff_content=patch.diff_content,
+                    changed_paths=patch.changed_paths,
+                    total_added_lines=patch.total_added_lines,
+                    total_removed_lines=patch.total_removed_lines,
+                    status=patch.status.value,
+                    created_at=patch.created_at,
+                )
+                session.add(record)
+        return patch
+
+    def get_patch(self, patch_id: str) -> Optional[Patch]:
+        """Retrieve a patch by ID."""
+        with self.db.session_scope() as session:
+            record = session.get(PatchTable, patch_id)
+            if not record:
+                return None
+            return Patch(
+                id=record.id,
+                repository_id=record.repository_id,
+                task_id=record.task_id,
+                base_sha=record.base_sha,
+                patch_hash=record.patch_hash,
+                diff_content=record.diff_content,
+                changed_paths=list(record.changed_paths or []),
+                total_added_lines=record.total_added_lines,
+                total_removed_lines=record.total_removed_lines,
+                status=PatchStatus(record.status),
+                created_at=record.created_at,
+            )
+
+    # ---------------- Verification Runs & Evidence Reports ----------------
+
+    def save_verification_run(self, vrun: VerificationRun) -> VerificationRun:
+        """Persist a verification run."""
+        with self.db.session_scope() as session:
+            record = VerificationRunTable(
+                id=vrun.id,
+                patch_id=vrun.patch_id,
+                task_id=vrun.task_id,
+                chain_id=vrun.chain_id,
+                base_sha=vrun.base_sha,
+                workspace_id=vrun.workspace_id,
+                sandbox_type=vrun.sandbox_type.value,
+                image_tag=vrun.image_tag,
+                image_digest=vrun.image_digest,
+                started_at=vrun.started_at,
+                completed_at=vrun.completed_at,
+                status=vrun.status.value,
+                checks_json=[c.model_dump() for c in vrun.checks],
+                obligation_rechecks_json=[o.model_dump() for o in vrun.obligation_rechecks],
+                has_regressions=vrun.has_regressions,
+            )
+            session.add(record)
+        return vrun
+
+    def get_verification_run(self, run_id: str) -> Optional[VerificationRun]:
+        """Retrieve a verification run by ID."""
+        with self.db.session_scope() as session:
+            record = session.get(VerificationRunTable, run_id)
+            if not record:
+                return None
+            checks = [VerificationCheck.model_validate(c) for c in (record.checks_json or [])]
+            rechecks = [ObligationRecheckResult.model_validate(o) for o in (record.obligation_rechecks_json or [])]
+            return VerificationRun(
+                id=record.id,
+                patch_id=record.patch_id,
+                task_id=record.task_id,
+                chain_id=record.chain_id,
+                base_sha=record.base_sha,
+                workspace_id=record.workspace_id,
+                sandbox_type=SandboxType(record.sandbox_type),
+                image_tag=record.image_tag,
+                image_digest=record.image_digest,
+                started_at=record.started_at,
+                completed_at=record.completed_at,
+                status=VerificationRunStatus(record.status),
+                checks=checks,
+                obligation_rechecks=rechecks,
+                has_regressions=record.has_regressions,
+            )
+
+    def save_evidence_report(self, report: EvidenceReport, run_id: Optional[str] = None) -> EvidenceReport:
+        """Persist a generated evidence report."""
+        with self.db.session_scope() as session:
+            record = EvidenceReportTable(
+                id=report.report_id,
+                verification_run_id=run_id or report.report_id,
+                report_json=report.model_dump(),
+                summary_markdown=report.summary_markdown,
+                generated_at=report.generated_at,
+            )
+            session.add(record)
+        return report
+
+    def get_evidence_report(self, report_or_run_id: str) -> Optional[EvidenceReport]:
+        """Retrieve a persisted evidence report by report ID or verification run ID."""
+        with self.db.session_scope() as session:
+            record = session.get(EvidenceReportTable, report_or_run_id)
+            if not record:
+                stmt = select(EvidenceReportTable).where(
+                    EvidenceReportTable.verification_run_id == report_or_run_id
+                )
+                record = session.scalars(stmt).first()
+            if not record:
+                return None
+            return EvidenceReport.model_validate(record.report_json)
+
     # ---------------- Checkpoints ----------------
 
     def create_checkpoint(self, chain_id: str) -> Checkpoint:
@@ -255,7 +391,6 @@ class TaskChainRepository:
         }
 
         with self.db.session_scope() as session:
-            # Count existing checkpoints to increment checkpoint_number
             stmt = select(CheckpointTable).where(CheckpointTable.chain_id == chain_id)
             existing_count = len(session.scalars(stmt).all())
 
@@ -298,26 +433,6 @@ class TaskChainRepository:
                 state_snapshot=record.state_snapshot,
                 created_at=record.created_at,
             )
-
-    def list_checkpoints(self, chain_id: str) -> List[Checkpoint]:
-        """List all checkpoints for a chain in chronological order."""
-        with self.db.session_scope() as session:
-            stmt = (
-                select(CheckpointTable)
-                .where(CheckpointTable.chain_id == chain_id)
-                .order_by(CheckpointTable.checkpoint_number)
-            )
-            records = session.scalars(stmt).all()
-            return [
-                Checkpoint(
-                    id=r.id,
-                    chain_id=r.chain_id,
-                    checkpoint_number=r.checkpoint_number,
-                    state_snapshot=r.state_snapshot,
-                    created_at=r.created_at,
-                )
-                for r in records
-            ]
 
     # ---------------- Audit Events ----------------
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import uuid
+from pathlib import Path
 from typing import List, Optional
 
 from repocontinuum.domain.planning import (
@@ -20,10 +21,22 @@ from repocontinuum.domain.planning import (
     TaskDependency,
     TaskStatus,
 )
+from repocontinuum.domain.verification import (
+    CheckStatus,
+    EvidenceReport,
+    Patch,
+    PatchStatus,
+    VerificationRun,
+    VerificationRunStatus,
+)
+from repocontinuum.execution.sandbox import BaseSandboxRunner
+from repocontinuum.patching.diff_parser import UnifiedDiffParser
+from repocontinuum.patching.security import PatchSecurityValidator
 from repocontinuum.persistence.repository import TaskChainRepository
 from repocontinuum.planning.dag import CycleDetectedError, DependencyGraph
 from repocontinuum.planning.obligation_ledger import ObligationLedger
 from repocontinuum.planning.state_machine import TaskStateMachine
+from repocontinuum.verification.engine import VerificationEngine
 
 
 class TaskChainService:
@@ -448,6 +461,136 @@ class TaskChainService:
             metadata={"status": chain.status.value},
         )
         return chain
+
+    # ---------------- Patch & Verification Operations ----------------
+
+    def propose_patch(
+        self,
+        task_id: str,
+        diff_content: str,
+        base_sha: str,
+        actor: ActorType = ActorType.USER,
+    ) -> Patch:
+        """Parse, validate, hash, and persist a patch proposal bound to a task and base SHA."""
+        task = self.repo.get_task(task_id)
+        if not task:
+            raise ValueError(f"Task '{task_id}' not found.")
+
+        # 1. Parse unified diff
+        file_diffs = UnifiedDiffParser.parse(diff_content)
+
+        # 2. Path security validation
+        changed_paths = PatchSecurityValidator.validate_patch_security(file_diffs)
+
+        # 3. Patch hash calculation
+        patch_hash = UnifiedDiffParser.compute_patch_hash(diff_content)
+
+        total_added = sum(fd.added_lines for fd in file_diffs)
+        total_removed = sum(fd.removed_lines for fd in file_diffs)
+
+        patch_id = f"pat-{uuid.uuid4().hex[:12]}"
+        now_utc = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+        patch = Patch(
+            id=patch_id,
+            repository_id=task.chain_id,  # associated repository
+            task_id=task.id,
+            base_sha=base_sha,
+            patch_hash=patch_hash,
+            diff_content=diff_content,
+            changed_paths=changed_paths,
+            total_added_lines=total_added,
+            total_removed_lines=total_removed,
+            status=PatchStatus.VALIDATED,
+            created_at=now_utc,
+        )
+        self.repo.save_patch(patch)
+
+        self._record_audit(
+            chain_id=task.chain_id,
+            task_id=task.id,
+            actor_type=actor,
+            action="PROPOSE_PATCH",
+            metadata={
+                "patch_id": patch.id,
+                "base_sha": base_sha,
+                "patch_hash": patch_hash,
+                "changed_files_count": len(changed_paths),
+            },
+        )
+        return patch
+
+    def get_patch(self, patch_id: str) -> Optional[Patch]:
+        """Retrieve a patch by ID."""
+        return self.repo.get_patch(patch_id)
+
+    def verify_patch(
+        self,
+        task_id: str,
+        patch_id: str,
+        repo_path: Path,
+        check_commands: Optional[List[List[str]]] = None,
+        sandbox_runner: Optional[BaseSandboxRunner] = None,
+        actor: ActorType = ActorType.USER,
+    ) -> tuple[VerificationRun, EvidenceReport]:
+        """Execute the isolated verification pipeline and record results and regressions."""
+        task = self.repo.get_task(task_id)
+        if not task:
+            raise ValueError(f"Task '{task_id}' not found.")
+
+        patch = self.repo.get_patch(patch_id)
+        if not patch:
+            raise ValueError(f"Patch '{patch_id}' not found.")
+
+        if patch.task_id != task.id:
+            raise ValueError(f"Patch '{patch_id}' does not belong to task '{task_id}'.")
+
+        # Fetch all obligations for chain to test regression on earlier active obligations
+        all_obligations = self.repo.get_obligations_for_chain(task.chain_id)
+
+        engine = VerificationEngine(sandbox_runner=sandbox_runner)
+        vrun, report = engine.verify_patch(
+            repo_path=repo_path,
+            task=task,
+            patch=patch,
+            earlier_active_obligations=all_obligations,
+            check_commands=check_commands,
+        )
+
+        # Persist run and report
+        self.repo.save_verification_run(vrun)
+        self.repo.save_evidence_report(report, run_id=vrun.id)
+
+        # Update patch status
+        if vrun.status == VerificationRunStatus.COMPLETED:
+            self.repo.save_patch(patch.model_copy(update={"status": PatchStatus.APPLIED}))
+        elif vrun.status == VerificationRunStatus.REGRESSION_DETECTED:
+            self.repo.save_patch(patch.model_copy(update={"status": PatchStatus.FAILED_APPLICATION}))
+            # Update chain status to reflect regression
+            chain = self.repo.get_chain(task.chain_id)
+            if chain:
+                self.repo.save_chain(chain.model_copy(update={"status": ChainStatus.FAILED}))
+
+        self._record_audit(
+            chain_id=task.chain_id,
+            task_id=task.id,
+            actor_type=actor,
+            action="VERIFY_PATCH",
+            metadata={
+                "run_id": vrun.id,
+                "status": vrun.status.value,
+                "has_regressions": vrun.has_regressions,
+            },
+        )
+        return vrun, report
+
+    def get_verification_run(self, run_id: str) -> Optional[VerificationRun]:
+        """Retrieve a verification run by ID."""
+        return self.repo.get_verification_run(run_id)
+
+    def get_evidence_report(self, report_id: str) -> Optional[EvidenceReport]:
+        """Retrieve an evidence report by ID."""
+        return self.repo.get_evidence_report(report_id)
 
     # ---------------- Helper Methods ----------------
 

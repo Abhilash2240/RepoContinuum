@@ -17,8 +17,8 @@ class Base(DeclarativeBase):
 class DatabaseManager:
     """Manages SQLAlchemy engine, schema creation, and session lifecycle."""
 
-    def __init__(self, db_url: str | None = None):
-        self.db_url = db_url or os.getenv("REPOCONTINUUM_DATABASE_URL", "sqlite:///repocontinuum.db")
+    def __init__(self, db_url: str | None = None, database_url: str | None = None):
+        self.db_url = db_url or database_url or os.getenv("REPOCONTINUUM_DATABASE_URL", "sqlite:///repocontinuum.db")
         # For SQLite, enable check_same_thread=False for testing convenience
         connect_args = {}
         if self.db_url.startswith("sqlite"):

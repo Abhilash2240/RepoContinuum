@@ -122,6 +122,7 @@ class ImportEdge(BaseModel):
 
 class TestCase(BaseModel):
     """Discovered test unit and heuristic linkage."""
+    __test__ = False
     model_config = ConfigDict(frozen=True)
 
     id: str

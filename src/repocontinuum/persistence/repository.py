@@ -8,6 +8,10 @@ from typing import List, Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from repocontinuum.domain.agent import (
+    AgentRun,
+    AgentRunStatus,
+)
 from repocontinuum.domain.planning import (
     ActorType,
     AuditEvent,
@@ -34,6 +38,7 @@ from repocontinuum.domain.verification import (
 )
 from repocontinuum.persistence.database import DatabaseManager
 from repocontinuum.persistence.tables import (
+    AgentRunTable,
     AuditEventTable,
     CheckpointTable,
     EvidenceReportTable,
@@ -371,6 +376,81 @@ class TaskChainRepository:
                 return None
             return EvidenceReport.model_validate(record.report_json)
 
+    # ---------------- Agent Runs ----------------
+
+    def save_agent_run(self, agent_run: AgentRun) -> AgentRun:
+        """Create or update a persisted agent run record."""
+        with self.db.session_scope() as session:
+            record = session.get(AgentRunTable, agent_run.id)
+            if not record:
+                record = AgentRunTable(
+                    id=agent_run.id,
+                    chain_id=agent_run.chain_id,
+                    task_id=agent_run.task_id,
+                    provider=agent_run.provider,
+                    model=agent_run.model,
+                    status=agent_run.status.value,
+                    prompt_hash=agent_run.prompt_hash,
+                    prompt_version=agent_run.prompt_version,
+                    attempt_number=agent_run.attempt_number,
+                    max_repair_attempts=agent_run.max_repair_attempts,
+                    tool_calls_json=agent_run.tool_calls,
+                    prompt_tokens=agent_run.prompt_tokens,
+                    completion_tokens=agent_run.completion_tokens,
+                    total_tokens=agent_run.total_tokens,
+                    estimated_cost_usd=agent_run.estimated_cost_usd,
+                    latency_ms=agent_run.latency_ms,
+                    retry_count=agent_run.retry_count,
+                    failure_category=agent_run.failure_category,
+                    proposed_patch_id=agent_run.proposed_patch_id,
+                    proposed_patch_hash=agent_run.proposed_patch_hash,
+                    verification_run_id=agent_run.verification_run_id,
+                    plan_approved_by=agent_run.plan_approved_by,
+                    plan_approved_at=agent_run.plan_approved_at,
+                    issue_analysis_json=agent_run.issue_analysis_json,
+                    task_plan_json=agent_run.task_plan_json,
+                    patch_proposal_json=agent_run.patch_proposal_json,
+                    created_at=agent_run.created_at,
+                    completed_at=agent_run.completed_at,
+                )
+                session.add(record)
+            else:
+                record.status = agent_run.status.value
+                record.attempt_number = agent_run.attempt_number
+                record.tool_calls_json = agent_run.tool_calls
+                record.prompt_tokens = agent_run.prompt_tokens
+                record.completion_tokens = agent_run.completion_tokens
+                record.total_tokens = agent_run.total_tokens
+                record.estimated_cost_usd = agent_run.estimated_cost_usd
+                record.latency_ms = agent_run.latency_ms
+                record.retry_count = agent_run.retry_count
+                record.failure_category = agent_run.failure_category
+                record.proposed_patch_id = agent_run.proposed_patch_id
+                record.proposed_patch_hash = agent_run.proposed_patch_hash
+                record.verification_run_id = agent_run.verification_run_id
+                record.plan_approved_by = agent_run.plan_approved_by
+                record.plan_approved_at = agent_run.plan_approved_at
+                record.issue_analysis_json = agent_run.issue_analysis_json
+                record.task_plan_json = agent_run.task_plan_json
+                record.patch_proposal_json = agent_run.patch_proposal_json
+                record.completed_at = agent_run.completed_at
+        return agent_run
+
+    def get_agent_run(self, run_id: str) -> Optional[AgentRun]:
+        """Retrieve an agent run by ID."""
+        with self.db.session_scope() as session:
+            record = session.get(AgentRunTable, run_id)
+            if not record:
+                return None
+            return self._to_agent_run_model(record)
+
+    def get_agent_runs_for_task(self, task_id: str) -> List[AgentRun]:
+        """Retrieve all agent runs for a specific task."""
+        with self.db.session_scope() as session:
+            stmt = select(AgentRunTable).where(AgentRunTable.task_id == task_id).order_by(AgentRunTable.created_at)
+            records = session.scalars(stmt).all()
+            return [self._to_agent_run_model(r) for r in records]
+
     # ---------------- Checkpoints ----------------
 
     def create_checkpoint(self, chain_id: str) -> Checkpoint:
@@ -503,4 +583,37 @@ class TaskChainRepository:
             status_reason=r.status_reason,
             created_at=r.created_at,
             updated_at=r.updated_at,
+        )
+
+    @staticmethod
+    def _to_agent_run_model(r: AgentRunTable) -> AgentRun:
+        return AgentRun(
+            id=r.id,
+            chain_id=r.chain_id,
+            task_id=r.task_id,
+            provider=r.provider,
+            model=r.model,
+            status=AgentRunStatus(r.status),
+            prompt_hash=r.prompt_hash,
+            prompt_version=r.prompt_version,
+            attempt_number=r.attempt_number,
+            max_repair_attempts=r.max_repair_attempts,
+            tool_calls=list(r.tool_calls_json or []),
+            prompt_tokens=r.prompt_tokens,
+            completion_tokens=r.completion_tokens,
+            total_tokens=r.total_tokens,
+            estimated_cost_usd=r.estimated_cost_usd,
+            latency_ms=r.latency_ms,
+            retry_count=r.retry_count,
+            failure_category=r.failure_category,
+            proposed_patch_id=r.proposed_patch_id,
+            proposed_patch_hash=r.proposed_patch_hash,
+            verification_run_id=r.verification_run_id,
+            plan_approved_by=r.plan_approved_by,
+            plan_approved_at=r.plan_approved_at,
+            issue_analysis_json=r.issue_analysis_json,
+            task_plan_json=r.task_plan_json,
+            patch_proposal_json=r.patch_proposal_json,
+            created_at=r.created_at,
+            completed_at=r.completed_at,
         )

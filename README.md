@@ -4,7 +4,7 @@ RepoContinuum is a local-first, repository-aware software maintenance assistant 
 
 ---
 
-## Current Status: Milestones 1, 2, and 3 Complete
+## Current Status: Milestones 1, 2, 3, and 4 Complete
 
 - **Milestone 1 (Repository Intelligence Foundation):**
   - Walks repository files with strict path-traversal and symlink escape checks.
@@ -192,4 +192,29 @@ repocontinuum verify report --run vrun-123456789abc
 To apply the latest database migrations:
 ```powershell
 python -m alembic upgrade head
+```
+
+### 4. Bounded LLM Agent Workflow
+
+Execute an end-to-end LLM-assisted maintenance workflow with mandatory human-in-the-loop plan approval:
+
+```powershell
+# 1. Analyze an issue using repository intelligence
+python -m repocontinuum.cli agent analyze --task <task_id> --repo <repo_path>
+
+# 2. Formulate a structured maintenance plan
+python -m repocontinuum.cli agent plan --task <task_id> --run <run_id> --repo <repo_path>
+
+# 3. Explicit human approval gate (mandatory before code generation)
+python -m repocontinuum.cli agent approve-plan --task <task_id> --run <run_id> --approver "developer-name"
+
+# 4. Propose a reviewable unified diff patch
+python -m repocontinuum.cli agent propose --task <task_id> --run <run_id> --repo <repo_path>
+
+# 5. Verify in isolated disposable sandbox (with automated repair if needed)
+python -m repocontinuum.cli agent verify --task <task_id> --run <run_id> --repo <repo_path>
+
+# 6. View agent run status and comprehensive report
+python -m repocontinuum.cli agent status --run <run_id>
+python -m repocontinuum.cli agent report --run <run_id>
 ```

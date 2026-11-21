@@ -22,6 +22,8 @@ from repocontinuum.patching.diff_parser import UnifiedDiffParser
 from repocontinuum.patching.security import PatchSecurityValidator
 from repocontinuum.persistence.database import DatabaseManager
 from repocontinuum.persistence.repository import TaskChainRepository
+from repocontinuum.agent.service import AgentService
+from repocontinuum.domain.agent import AgentRunStatus
 from repocontinuum.planning.service import TaskChainService
 
 app = typer.Typer(
@@ -58,6 +60,13 @@ verify_app = typer.Typer(
 )
 app.add_typer(verify_app)
 
+agent_app = typer.Typer(
+    name="agent",
+    help="Bounded LLM agent planning, patch proposal, and verification",
+    add_completion=False,
+)
+app.add_typer(agent_app)
+
 console = Console()
 
 
@@ -67,6 +76,12 @@ def _get_service() -> TaskChainService:
     db.create_tables()
     repo = TaskChainRepository(db)
     return TaskChainService(repo)
+
+
+def _get_agent_service() -> AgentService:
+    """Initialize TaskChainService and return an AgentService instance."""
+    service = _get_service()
+    return AgentService(service)
 
 
 # ================= System / Version Commands =================
@@ -681,6 +696,256 @@ def _display_verification_report(vrun: VerificationRun, report: EvidenceReport) 
         console.print("\n[bold red]⚠️ REGRESSIONS DETECTED:[/bold red]")
         for reg in report.regressions_detected:
             console.print(f" • [red]{reg}[/red]")
+
+
+# ================= Agent Commands =================
+
+@agent_app.command(name="analyze")
+def agent_analyze(
+    task_id: str = typer.Option(..., "--task", "-t", help="Target maintenance task ID"),
+    repo_path: Path = typer.Option(
+        Path("."),
+        "--repo",
+        "-r",
+        help="Path to repository root",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        resolve_path=True,
+    ),
+) -> None:
+    """Analyze a maintenance task using bounded LLM intelligence and repository state."""
+    agent_service = _get_agent_service()
+    with console.status("[bold blue]Performing structured issue analysis...[/bold blue]"):
+        try:
+            agent_run, analysis = agent_service.analyze_task(task_id=task_id, repo_path=repo_path)
+        except Exception as e:
+            console.print(f"[bold red]Analysis failed:[/bold red] {e}")
+            raise typer.Exit(code=1)
+
+    header = Table(show_header=False, box=None)
+    header.add_row("[bold]Agent Run:[/bold]", agent_run.id)
+    header.add_row("[bold]Task ID:[/bold]", task_id)
+    header.add_row("[bold]Provider / Model:[/bold]", f"{agent_run.provider} ({agent_run.model})")
+    header.add_row("[bold]Assessed Risk:[/bold]", analysis.risk_level.upper())
+    header.add_row("[bold]Confidence:[/bold]", f"{analysis.confidence:.2f}")
+    console.print(Panel(header, title="[bold cyan]RepoContinuum — Issue Analysis[/bold cyan]", border_style="cyan"))
+
+    console.print(f"[bold]Summary:[/bold] {analysis.problem_summary}")
+    console.print(f"[bold]Observed:[/bold] {analysis.observed_behaviour}")
+    console.print(f"[bold]Expected:[/bold] {analysis.expected_behaviour}")
+
+    if analysis.likely_affected_files:
+        console.print("\n[bold]Likely Affected Files:[/bold]")
+        for f in analysis.likely_affected_files:
+            console.print(f" • [cyan]{f}[/cyan]")
+
+    if analysis.relevant_tests:
+        console.print("\n[bold]Relevant Tests:[/bold]")
+        for t in analysis.relevant_tests:
+            console.print(f" • [green]{t}[/green]")
+
+    console.print(f"\n[green]✓[/green] Analysis saved. Next step: [bold]repocontinuum agent plan --task {task_id} --run {agent_run.id}[/bold]")
+
+
+@agent_app.command(name="plan")
+def agent_plan(
+    task_id: str = typer.Option(..., "--task", "-t", help="Target maintenance task ID"),
+    run_id: Optional[str] = typer.Option(None, "--run", help="Optional existing Agent Run ID"),
+    repo_path: Path = typer.Option(
+        Path("."),
+        "--repo",
+        "-r",
+        help="Path to repository root",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        resolve_path=True,
+    ),
+) -> None:
+    """Generate a step-by-step TaskPlan validated against repository intelligence."""
+    agent_service = _get_agent_service()
+    with console.status("[bold blue]Generating dependency-aware task plan...[/bold blue]"):
+        try:
+            agent_run, plan = agent_service.plan_task(task_id=task_id, repo_path=repo_path, run_id=run_id)
+        except Exception as e:
+            console.print(f"[bold red]Planning failed:[/bold red] {e}")
+            raise typer.Exit(code=1)
+
+    table = Table(title=f"Proposed Plan — Task {task_id} (Run: {agent_run.id})", show_lines=True)
+    table.add_column("Step", justify="right", style="bold")
+    table.add_column("Instruction")
+
+    for idx, step in enumerate(plan.ordered_steps, start=1):
+        table.add_row(str(idx), step)
+
+    console.print(table)
+    console.print(f"[bold]Test Strategy:[/bold] {plan.test_strategy}")
+
+    if plan.risks:
+        console.print("[yellow]Identified Risks:[/yellow]")
+        for r in plan.risks:
+            console.print(f" • [yellow]{r}[/yellow]")
+
+    console.print(f"\n[yellow]Human approval required before patch generation.[/yellow]")
+    console.print(f"Approve with: [bold]repocontinuum agent approve-plan --task {task_id} --run {agent_run.id}[/bold]")
+
+
+@agent_app.command(name="approve-plan")
+def agent_approve_plan(
+    task_id: str = typer.Option(..., "--task", "-t", help="Target maintenance task ID"),
+    run_id: str = typer.Option(..., "--run", help="Agent Run ID to approve"),
+    approver: str = typer.Option("human-developer", "--approver", help="Name or handle of approver"),
+) -> None:
+    """Approve a proposed TaskPlan, enabling patch generation."""
+    agent_service = _get_agent_service()
+    try:
+        agent_run = agent_service.approve_plan(task_id=task_id, run_id=run_id, approver=approver)
+        console.print(
+            f"[bold green]✓ Plan Approved[/bold green] for Task [bold]{task_id}[/bold] by [cyan]{approver}[/cyan]."
+        )
+        console.print(f"Next step: [bold]repocontinuum agent propose --task {task_id} --run {agent_run.id}[/bold]")
+    except Exception as e:
+        console.print(f"[bold red]Plan approval failed:[/bold red] {e}")
+        raise typer.Exit(code=1)
+
+
+@agent_app.command(name="propose")
+def agent_propose_patch(
+    task_id: str = typer.Option(..., "--task", "-t", help="Target maintenance task ID"),
+    run_id: str = typer.Option(..., "--run", help="Approved Agent Run ID"),
+    repo_path: Path = typer.Option(
+        Path("."),
+        "--repo",
+        "-r",
+        help="Path to repository root",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        resolve_path=True,
+    ),
+) -> None:
+    """Propose a code patch based on the approved plan."""
+    agent_service = _get_agent_service()
+    with console.status("[bold blue]Synthesizing and validating patch proposal...[/bold blue]"):
+        try:
+            agent_run, proposal = agent_service.propose_patch(task_id=task_id, run_id=run_id, repo_path=repo_path)
+        except Exception as e:
+            console.print(f"[bold red]Patch proposal failed:[/bold red] {e}")
+            raise typer.Exit(code=1)
+
+    console.print(
+        f"[bold green]✓ Patch Proposed:[/bold green] Registered as [cyan]{agent_run.proposed_patch_id}[/cyan] "
+        f"(Hash: [yellow]{agent_run.proposed_patch_hash[:16]}...[/yellow])"
+    )
+    console.print(f"[bold]Summary:[/bold] {proposal.summary}")
+    console.print(f"[bold]Changed Files:[/bold] {', '.join(proposal.changed_paths)}")
+    console.print(f"\nNext step: [bold]repocontinuum agent verify --task {task_id} --run {agent_run.id}[/bold]")
+
+
+@agent_app.command(name="verify")
+def agent_verify(
+    task_id: str = typer.Option(..., "--task", "-t", help="Target maintenance task ID"),
+    run_id: str = typer.Option(..., "--run", help="Agent Run ID with proposed patch"),
+    repo_path: Path = typer.Option(
+        Path("."),
+        "--repo",
+        "-r",
+        help="Path to repository root",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        resolve_path=True,
+    ),
+    fake_sandbox: bool = typer.Option(
+        False,
+        "--fake-sandbox",
+        help="Use deterministic fake sandbox runner for local testing",
+    ),
+) -> None:
+    """Run isolated verification and autonomous bounded repair loop."""
+    agent_service = _get_agent_service()
+    runner = FakeSandboxRunner() if fake_sandbox else DockerSandboxRunner()
+
+    with console.status("[bold blue]Executing verification & regression checks...[/bold blue]"):
+        try:
+            agent_run, vrun, report = agent_service.verify_and_repair(
+                task_id=task_id,
+                run_id=run_id,
+                repo_path=repo_path,
+                sandbox_runner=runner,
+            )
+        except Exception as e:
+            console.print(f"[bold red]Verification execution failed:[/bold red] {e}")
+            raise typer.Exit(code=1)
+
+    if agent_run.status == AgentRunStatus.VERIFICATION_PASSED:
+        console.print(f"[bold green]✓ VERIFICATION PASSED[/bold green] (Attempt {agent_run.attempt_number}/{agent_run.max_repair_attempts})")
+        if report:
+            _display_verification_report(vrun, report)
+    elif agent_run.status == AgentRunStatus.BUDGET_EXHAUSTED:
+        console.print(f"[bold red]✗ REPAIR BUDGET EXHAUSTED[/bold red] ({agent_run.max_repair_attempts} attempts reached). Human attention required.")
+        if report:
+            _display_verification_report(vrun, report)
+        raise typer.Exit(code=1)
+    else:
+        console.print(f"[bold red]✗ VERIFICATION FAILED[/bold red] Status: {agent_run.status.value}")
+        if report:
+            _display_verification_report(vrun, report)
+        raise typer.Exit(code=1)
+
+
+@agent_app.command(name="status")
+def agent_status(
+    run_id: str = typer.Option(..., "--run", help="Agent Run ID to query"),
+) -> None:
+    """Display comprehensive status for an agent run."""
+    agent_service = _get_agent_service()
+    agent_run = agent_service.get_agent_run(run_id)
+    if not agent_run:
+        console.print(f"[bold red]Agent run '{run_id}' not found.[/bold red]")
+        raise typer.Exit(code=1)
+
+    header = Table(show_header=False, box=None)
+    header.add_row("[bold]Agent Run ID:[/bold]", agent_run.id)
+    header.add_row("[bold]Task ID:[/bold]", agent_run.task_id)
+    header.add_row("[bold]Chain ID:[/bold]", agent_run.chain_id)
+    header.add_row("[bold]Provider / Model:[/bold]", f"{agent_run.provider} ({agent_run.model})")
+    header.add_row("[bold]Status:[/bold]", agent_run.status.value)
+    header.add_row("[bold]Attempt Count:[/bold]", f"{agent_run.attempt_number}/{agent_run.max_repair_attempts}")
+    header.add_row("[bold]Total Tokens:[/bold]", str(agent_run.total_tokens))
+    header.add_row("[bold]Proposed Patch:[/bold]", agent_run.proposed_patch_id or "-")
+    header.add_row("[bold]Plan Approved By:[/bold]", agent_run.plan_approved_by or "Not approved yet")
+
+    console.print(Panel(header, title="[bold cyan]RepoContinuum — Agent Run Status[/bold cyan]", border_style="cyan"))
+
+
+@agent_app.command(name="report")
+def agent_report(
+    run_id: str = typer.Option(..., "--run", help="Agent Run ID to render"),
+) -> None:
+    """Render full markdown summary and evidence for an agent run."""
+    agent_service = _get_agent_service()
+    agent_run = agent_service.get_agent_run(run_id)
+    if not agent_run:
+        console.print(f"[bold red]Agent run '{run_id}' not found.[/bold red]")
+        raise typer.Exit(code=1)
+
+    agent_status(run_id)
+
+    if agent_run.issue_analysis_json:
+        console.print("\n[bold cyan]=== Issue Analysis ===[/bold cyan]")
+        console.print(agent_run.issue_analysis_json.get("problem_summary", ""))
+
+    if agent_run.task_plan_json:
+        console.print("\n[bold cyan]=== Task Plan ===[/bold cyan]")
+        steps = agent_run.task_plan_json.get("ordered_steps", [])
+        for i, s in enumerate(steps, start=1):
+            console.print(f" {i}. {s}")
+
+    if agent_run.verification_run_id:
+        console.print("\n[bold cyan]=== Verification Evidence ===[/bold cyan]")
+        verify_report_cmd(agent_run.verification_run_id)
 
 
 if __name__ == "__main__":

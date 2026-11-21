@@ -24,7 +24,7 @@ RepoContinuum follows a strict milestone-driven, test-first, human-controlled de
 [Milestone 3: Patch & Isolated Verification Loop] ──> COMPLETE ◄── DELIVERED
              │
              ▼
-[Milestone 4: LLM Provider & Bounded Agent]
+[Milestone 4: LLM Provider & Bounded Agent] ───> COMPLETE ◄─── DELIVERED
              │
              ▼
 [Milestone 5: Dashboard & GitHub Read Integration]
@@ -220,3 +220,51 @@ Deliver an isolated verification pipeline that safely parses, validates, and has
 - Unit tests: `test_diff_parser.py`, `test_patch_security.py`, `test_allowlist_and_secrets.py`, `test_sandbox.py`.
 - Integration tests: `test_disposable_workspace.py`, `test_patch_applier.py`, `test_verification_engine.py`.
 - CLI tests: `test_cli_patch_verify.py`.
+
+---
+
+## 7. Phase 4 — LLM Provider Integration and Bounded Agent
+
+### Objectives
+- Evolve RepoContinuum into an LLM-assisted repository maintenance agent.
+- Implement provider abstraction supporting official `google-genai` SDK and deterministic `FakeLLMProvider`.
+- Enforce strongly-typed Pydantic response schemas (`IssueAnalysis`, `TaskPlan`, `PatchProposal`, `ToolIntent`).
+- Implement context builder with prompt-injection defense via `<UNTRUSTED_REPOSITORY_DATA>` boundary tags.
+- Build bounded read-only tool dispatcher with strict allowlist, path traversal guards, secret protection, and call budgets.
+- Implement explicit human plan approval gate before patch proposal and verification.
+- Implement bounded verification and repair loop with budget enforcement.
+- Persist agent runs and telemetry via SQLAlchemy and Alembic migration `0003_agent_run_schema.py`.
+- Add comprehensive Typer CLI commands for agent operations.
+
+### Completed Deliverables
+1. **Configuration & Secrets (`src/repocontinuum/agent/config.py`)**:
+   - `AgentSettings` with Pydantic Settings, masking `SecretStr` for API keys.
+2. **Provider Abstraction (`src/repocontinuum/agent/providers/`)**:
+   - `BaseLLMProvider`, `ProviderResponse[T]`, `UsageMetadata`.
+   - `GeminiProvider`: Uses official `google-genai` SDK (`types.GenerateContentConfig` with structured JSON output), exponential backoff retries.
+   - `FakeLLMProvider`: Deterministic, zero-network test double with canned responses and deterministic default schemas.
+   - Isolated exception hierarchy (`LLMAuthenticationError`, `LLMRateLimitError`, etc.).
+3. **Structured Schemas (`src/repocontinuum/agent/schemas/`)**:
+   - `IssueAnalysis`, `TaskPlan`, `PatchProposal`, `ToolIntent`.
+4. **Bounded Tool Dispatcher (`src/repocontinuum/agent/tools/`)**:
+   - Allowlist of 8 read tools (`get_repository_summary`, `search_symbols`, `get_symbol_source`, `get_file_content`, `get_import_dependencies`, `get_task_dependencies`, `get_active_obligations`, `get_test_inventory`).
+   - Unconditional rejection of shell commands, process execution, and protected files (`.git/**`, `.env*`, keys, workflows).
+   - 32 KB per-call size limit and tool call budget (default 10 calls).
+5. **Context Builder (`src/repocontinuum/agent/context/`)**:
+   - Untrusted repository data wrapped in `<UNTRUSTED_REPOSITORY_DATA source="...">` tags.
+   - Invariant active obligations preserved intact outside untrusted blocks.
+   - Character budgeting with deterministic truncation.
+6. **Agent Service & Bounded Repair Loop (`src/repocontinuum/agent/service.py`)**:
+   - `analyze_task`, `plan_task`, `approve_plan` (mandatory human gate), `propose_patch`, `verify_and_repair`.
+   - Bounded repair iteration injecting previous failure logs; halts with `BUDGET_EXHAUSTED` when budget is reached.
+7. **Persistence & Migrations (`src/repocontinuum/persistence/`, `migrations/`)**:
+   - `AgentRun` domain model and `AgentRunTable` SQLAlchemy mapping.
+   - Alembic migration `0003_agent_run_schema.py` verified with zero schema drift.
+8. **Typer CLI Agent Subcommands (`src/repocontinuum/cli.py`)**:
+   - `agent analyze`, `agent plan`, `agent approve-plan`, `agent propose`, `agent verify`, `agent status`, `agent report`.
+
+### Test Suite (116 Passed, 2 Skipped, 0 Failed)
+- Unit tests: `test_agent_providers.py`, `test_agent_schemas.py`, `test_agent_context.py`, `test_agent_tools.py`.
+- Security tests: `test_agent_security.py`.
+- Integration tests: `test_agent_workflow.py`.
+- CLI tests: `test_cli_agent.py`.

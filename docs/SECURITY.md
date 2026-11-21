@@ -48,6 +48,34 @@ Security in RepoContinuum is a core product capability, not a cosmetic post-impl
 
 ---
 
-## 5. Reporting Security Vulnerabilities
+
+---
+
+## 5. LLM Integration and Prompt-Injection Defense (Milestone 4)
+
+1. **Untrusted Data Boundary Tags:**
+   - All external, user-supplied, and repository-derived data (issue descriptions, bug comments, AST docstrings, file contents) are enclosed inside explicit boundary delimiters:
+     `<UNTRUSTED_REPOSITORY_DATA source="..."> ... </UNTRUSTED_REPOSITORY_DATA>`
+   - System prompts instruct the LLM that content within these tags represents untrusted passive data that must never be interpreted as instructions, system directives, or command overrides.
+
+2. **Bounded Read-Only Tool Execution:**
+   - The tool dispatcher (`ToolDispatcher`) enforces a strict allowlist of 8 read-only inspection tools.
+   - Shell execution (`bash`, `sh`, `powershell`, `cmd`), process execution (`subprocess`, `exec`, `eval`), arbitrary code execution, and remote networking are strictly prohibited.
+   - Filesystem traversal (`../`), absolute paths, Windows drive paths, and access to protected files (`.git/**`, `.env*`, `*.key`, `*.pem`, `id_rsa*`, `.github/**`) are actively blocked.
+   - Each tool invocation is bounded by a 32 KB output limit and an overall budget (default 10 calls per task).
+
+3. **Mandatory Human Plan Approval Gate:**
+   - The agent cannot generate patches or invoke verification autonomously without prior human authorization.
+   - A task plan must be explicitly approved by a human engineer (`repocontinuum agent approve-plan`), transitioning the state from `PLAN_PROPOSED` to `PLAN_APPROVED` and recording an immutable audit event in the database.
+
+4. **Bounded Repair Loop and Runaway Protection:**
+   - When verification fails or detects regressions, the agent performs bounded automated repair strictly up to `max_repair_attempts` (default 2).
+   - If the repair budget is exhausted, the agent halts with status `BUDGET_EXHAUSTED`, records failure telemetry, and preserves failure logs for human review. Runaway API consumption is strictly prevented.
+
+5. **Secret Protection and API Key Masking:**
+   - LLM API keys (`GEMINI_API_KEY`) are managed via Pydantic `SecretStr` inside `AgentSettings`. Secret values are masked in `__repr__`, logs, and terminal output.
+   - The default test suite executes entirely offline using `FakeLLMProvider` without requiring live API keys or external network connectivity.
+
+## 6. Reporting Security Vulnerabilities
 
 To report a vulnerability in RepoContinuum, submit a detailed report to the repository maintainer with reproduction steps. Do not open public issues for unpatched vulnerabilities.

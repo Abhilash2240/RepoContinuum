@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 from sqlalchemy import (
     Boolean,
+    Float,
     ForeignKey,
     Integer,
     JSON,
@@ -197,3 +198,37 @@ class EvidenceReportTable(Base):
     generated_at: Mapped[str] = mapped_column(String(64), nullable=False)
 
     verification_run: Mapped[VerificationRunTable] = relationship("VerificationRunTable", back_populates="evidence_report")
+
+
+class AgentRunTable(Base):
+    """Persisted record of an LLM agent execution run."""
+    __tablename__ = "agent_runs"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    chain_id: Mapped[str] = mapped_column(String(64), ForeignKey("task_chains.id", ondelete="CASCADE"), nullable=False)
+    task_id: Mapped[str] = mapped_column(String(64), ForeignKey("maintenance_tasks.id", ondelete="CASCADE"), nullable=False)
+    provider: Mapped[str] = mapped_column(String(64), nullable=False)
+    model: Mapped[str] = mapped_column(String(128), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    prompt_hash: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    prompt_version: Mapped[str] = mapped_column(String(32), default="1.0", nullable=False)
+    attempt_number: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    max_repair_attempts: Mapped[int] = mapped_column(Integer, default=2, nullable=False)
+    tool_calls_json: Mapped[List[Dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
+    prompt_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    completion_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    total_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    estimated_cost_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    latency_ms: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    retry_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    failure_category: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    proposed_patch_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    proposed_patch_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    verification_run_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    plan_approved_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    plan_approved_at: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    issue_analysis_json: Mapped[Dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    task_plan_json: Mapped[Dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    patch_proposal_json: Mapped[Dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[str] = mapped_column(String(64), nullable=False)
+    completed_at: Mapped[str | None] = mapped_column(String(64), nullable=True)

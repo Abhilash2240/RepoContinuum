@@ -3,6 +3,7 @@
 from repocontinuum.persistence.database import Base, DatabaseManager
 from repocontinuum.persistence.repository import TaskChainRepository
 from repocontinuum.persistence.tables import (
+    AgentRunTable,
     AuditEventTable,
     CheckpointTable,
     EvidenceReportTable,
@@ -15,6 +16,7 @@ from repocontinuum.persistence.tables import (
 )
 
 __all__ = [
+    "AgentRunTable",
     "AuditEventTable",
     "Base",
     "CheckpointTable",

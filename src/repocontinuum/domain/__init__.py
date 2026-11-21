@@ -1,5 +1,9 @@
 """Domain models package for RepoContinuum."""
 
+from repocontinuum.domain.agent import (
+    AgentRun,
+    AgentRunStatus,
+)
 from repocontinuum.domain.models import (
     ConfidenceLevel,
     ImportEdge,
@@ -51,6 +55,8 @@ from repocontinuum.domain.verification import (
 
 __all__ = [
     "ActorType",
+    "AgentRun",
+    "AgentRunStatus",
     "AuditEvent",
     "ChainStatus",
     "CheckStatus",

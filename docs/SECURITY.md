@@ -73,8 +73,9 @@ Security in RepoContinuum is a core product capability, not a cosmetic post-impl
    - If the repair budget is exhausted, the agent halts with status `BUDGET_EXHAUSTED`, records failure telemetry, and preserves failure logs for human review. Runaway API consumption is strictly prevented.
 
 5. **Secret Protection and API Key Masking:**
-   - LLM API keys (`GEMINI_API_KEY`) are managed via Pydantic `SecretStr` inside `AgentSettings`. Secret values are masked in `__repr__`, logs, and terminal output.
-   - The default test suite executes entirely offline using `FakeLLMProvider` without requiring live API keys or external network connectivity.
+   - LLM API keys (`GEMINI_API_KEY`, `OPENROUTER_API_KEY`) are managed via Pydantic `SecretStr` inside `AgentSettings`. Secret values are masked in `__repr__`, logs, and terminal output.
+   - Provider adapters (`GeminiProvider`, `OpenRouterProvider`) actively redact secrets from error messages, representations, and logs.
+   - The default test suite executes entirely offline using `FakeLLMProvider` and mocked HTTP doubles without requiring live API keys or external network connectivity.
 
 ## 6. Dashboard and GitHub Read Security (Milestone 5)
 

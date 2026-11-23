@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from typing import Optional
-from pydantic import Field, SecretStr
+from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,12 +15,13 @@ class AgentSettings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        populate_by_name=True,
     )
 
     llm_provider: str = Field(
         default="fake",
-        alias="REPOCONTINUUM_LLM_PROVIDER",
-        description="Active LLM provider: 'gemini' or 'fake'.",
+        validation_alias=AliasChoices("llm_provider", "REPOCONTINUUM_LLM_PROVIDER", "AI_PROVIDER"),
+        description="Active LLM provider: 'gemini', 'openrouter', or 'fake'.",
     )
     gemini_api_key: Optional[SecretStr] = Field(
         default=None,
@@ -31,6 +32,31 @@ class AgentSettings(BaseSettings):
         default="gemini-2.5-flash",
         alias="GEMINI_MODEL",
         description="Target Google Gemini model identifier.",
+    )
+    openrouter_api_key: Optional[SecretStr] = Field(
+        default=None,
+        alias="OPENROUTER_API_KEY",
+        description="OpenRouter API key.",
+    )
+    openrouter_base_url: str = Field(
+        default="https://openrouter.ai/api/v1",
+        alias="OPENROUTER_BASE_URL",
+        description="OpenRouter API base URL.",
+    )
+    openrouter_model: str = Field(
+        default="particle-ai/particle-1:free",
+        alias="OPENROUTER_MODEL",
+        description="Target OpenRouter model identifier.",
+    )
+    openrouter_site_url: Optional[str] = Field(
+        default=None,
+        alias="OPENROUTER_SITE_URL",
+        description="Optional site URL sent via HTTP-Referer for OpenRouter rankings.",
+    )
+    openrouter_app_name: str = Field(
+        default="RepoContinuum",
+        alias="OPENROUTER_APP_NAME",
+        description="Application name sent via X-Title header.",
     )
     llm_timeout_seconds: int = Field(
         default=60,
@@ -66,3 +92,7 @@ class AgentSettings(BaseSettings):
     def is_gemini_configured(self) -> bool:
         """Check if live Gemini API key is present."""
         return self.gemini_api_key is not None and bool(self.gemini_api_key.get_secret_value().strip())
+
+    def is_openrouter_configured(self) -> bool:
+        """Check if live OpenRouter API key is present."""
+        return self.openrouter_api_key is not None and bool(self.openrouter_api_key.get_secret_value().strip())

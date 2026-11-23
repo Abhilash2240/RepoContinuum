@@ -84,9 +84,11 @@ def test_agent_settings_masks_api_key_representation():
     settings = AgentSettings(
         gemini_api_key="AIzaSyDummySecretKey1234567890",
         gemini_model="gemini-2.5-flash",
+        openrouter_api_key="sk-or-v1-DummyOpenRouterKey998877",
     )
     repr_str = repr(settings)
     assert "AIzaSyDummySecretKey1234567890" not in repr_str
+    assert "sk-or-v1-DummyOpenRouterKey998877" not in repr_str
     assert "**********" in repr_str or "SecretStr" in repr_str
 
 

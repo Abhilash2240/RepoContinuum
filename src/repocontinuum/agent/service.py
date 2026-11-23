@@ -10,8 +10,10 @@ from typing import Any, Dict, List, Optional
 from repocontinuum.agent.config import AgentSettings
 from repocontinuum.agent.context.builder import ContextBuilder
 from repocontinuum.agent.providers.base import BaseLLMProvider
+from repocontinuum.agent.providers.exceptions import LLMAuthenticationError
 from repocontinuum.agent.providers.fake import FakeLLMProvider
 from repocontinuum.agent.providers.gemini import GeminiProvider
+from repocontinuum.agent.providers.openrouter import OpenRouterProvider
 from repocontinuum.agent.schemas.issue_analysis import IssueAnalysis
 from repocontinuum.agent.schemas.patch_proposal import PatchProposal
 from repocontinuum.agent.schemas.task_plan import TaskPlan
@@ -55,14 +57,37 @@ class AgentService:
 
         if provider:
             self.provider = provider
-        elif self.settings.llm_provider.lower() == "gemini" and self.settings.is_gemini_configured():
-            self.provider = GeminiProvider(
-                api_key=self.settings.gemini_api_key.get_secret_value(),  # type: ignore[union-attr]
-                model_name=self.settings.gemini_model,
-                max_output_tokens=self.settings.llm_max_output_tokens,
-                timeout_seconds=self.settings.llm_timeout_seconds,
-                max_retries=self.settings.llm_max_retries,
-            )
+        elif self.settings.llm_provider.lower() == "gemini":
+            if self.settings.is_gemini_configured():
+                self.provider = GeminiProvider(
+                    api_key=self.settings.gemini_api_key.get_secret_value(),  # type: ignore[union-attr]
+                    model_name=self.settings.gemini_model,
+                    max_output_tokens=self.settings.llm_max_output_tokens,
+                    timeout_seconds=self.settings.llm_timeout_seconds,
+                    max_retries=self.settings.llm_max_retries,
+                )
+            else:
+                raise LLMAuthenticationError(
+                    "LLM provider is set to 'gemini' but GEMINI_API_KEY is not configured.",
+                    provider="gemini",
+                )
+        elif self.settings.llm_provider.lower() == "openrouter":
+            if self.settings.is_openrouter_configured():
+                self.provider = OpenRouterProvider(
+                    api_key=self.settings.openrouter_api_key.get_secret_value(),  # type: ignore[union-attr]
+                    model_name=self.settings.openrouter_model,
+                    base_url=self.settings.openrouter_base_url,
+                    site_url=self.settings.openrouter_site_url,
+                    app_name=self.settings.openrouter_app_name,
+                    max_output_tokens=self.settings.llm_max_output_tokens,
+                    timeout_seconds=self.settings.llm_timeout_seconds,
+                    max_retries=self.settings.llm_max_retries,
+                )
+            else:
+                raise LLMAuthenticationError(
+                    "LLM provider is set to 'openrouter' but OPENROUTER_API_KEY is not configured.",
+                    provider="openrouter",
+                )
         else:
             self.provider = FakeLLMProvider()
 

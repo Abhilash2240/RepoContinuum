@@ -34,7 +34,7 @@ RepoContinuum is a local-first, repository-aware software maintenance assistant 
   - Full provenance and evidence reporting stored in database and rendered in formatted Markdown.
 
 - **Milestone 4 (LLM Provider Integration & Bounded Agent):**
-  - Provider-agnostic LLM interface with Google Gemini (`google-genai` SDK) and deterministic `FakeLLMProvider`.
+  - Provider-agnostic LLM interface with Google Gemini (`google-genai` SDK), OpenRouter (`particle-ai/particle-1:free` via OpenAI-compatible API), and deterministic `FakeLLMProvider`.
   - Strongly-typed Pydantic schemas (`IssueAnalysis`, `TaskPlan`, `PatchProposal`, `ToolIntent`).
   - Context builder with prompt-injection defense via `<UNTRUSTED_REPOSITORY_DATA>` boundary encapsulation.
   - Bounded read-only tool dispatcher with closed allowlist, traversal guards, sensitive file blocking, and call budgets.
@@ -223,6 +223,30 @@ python -m alembic upgrade head
 ```
 
 ### 4. Bounded LLM Agent Workflow
+
+#### LLM Provider Configuration
+
+RepoContinuum supports multiple LLM providers configured via environment variables (`.env`):
+
+1. **Offline / Fake Provider (Default):**
+   ```env
+   REPOCONTINUUM_LLM_PROVIDER=fake
+   ```
+2. **Google Gemini Provider:**
+   ```env
+   REPOCONTINUUM_LLM_PROVIDER=gemini
+   GEMINI_API_KEY=your_gemini_api_key
+   GEMINI_MODEL=gemini-2.5-flash
+   ```
+3. **OpenRouter Provider (Particle-1 Free):**
+   ```env
+   AI_PROVIDER=openrouter
+   OPENROUTER_API_KEY=your_openrouter_api_key
+   OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+   OPENROUTER_MODEL=particle-ai/particle-1:free
+   OPENROUTER_SITE_URL=https://github.com/repocontinuum
+   OPENROUTER_APP_NAME=RepoContinuum
+   ```
 
 Execute an end-to-end LLM-assisted maintenance workflow with mandatory human-in-the-loop plan approval:
 

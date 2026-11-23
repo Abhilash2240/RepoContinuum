@@ -242,6 +242,7 @@ Deliver an isolated verification pipeline that safely parses, validates, and has
 2. **Provider Abstraction (`src/repocontinuum/agent/providers/`)**:
    - `BaseLLMProvider`, `ProviderResponse[T]`, `UsageMetadata`.
    - `GeminiProvider`: Uses official `google-genai` SDK (`types.GenerateContentConfig` with structured JSON output), exponential backoff retries.
+   - `OpenRouterProvider`: Uses OpenAI-compatible Chat Completions API with `particle-ai/particle-1:free`, schema-directed output, markdown fence stripping, and exponential backoff retries.
    - `FakeLLMProvider`: Deterministic, zero-network test double with canned responses and deterministic default schemas.
    - Isolated exception hierarchy (`LLMAuthenticationError`, `LLMRateLimitError`, etc.).
 3. **Structured Schemas (`src/repocontinuum/agent/schemas/`)**:

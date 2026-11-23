@@ -13,6 +13,7 @@ from repocontinuum.agent.providers.exceptions import (
 )
 from repocontinuum.agent.providers.fake import FakeLLMProvider
 from repocontinuum.agent.providers.gemini import GeminiProvider
+from repocontinuum.agent.providers.openrouter import OpenRouterProvider
 
 __all__ = [
     "BaseLLMProvider",
@@ -28,4 +29,5 @@ __all__ = [
     "LLMInvalidResponseError",
     "FakeLLMProvider",
     "GeminiProvider",
+    "OpenRouterProvider",
 ]

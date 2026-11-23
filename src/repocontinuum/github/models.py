@@ -1,9 +1,22 @@
-"""Strongly-typed Pydantic schemas for GitHub API entities."""
+"""Strongly-typed Pydantic schemas for GitHub API entities and publication workflows."""
 
 from __future__ import annotations
 
-from typing import List, Optional
+from enum import Enum
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, ConfigDict, Field
+
+
+class ApprovalStatus(str, Enum):
+    """Lifecycle status for publication approvals and runs."""
+    AWAITING_APPROVAL = "AWAITING_APPROVAL"
+    APPROVED = "APPROVED"
+    INVALIDATED = "INVALIDATED"
+    PUBLISHING = "PUBLISHING"
+    BRANCH_CREATED = "BRANCH_CREATED"
+    PR_CREATED = "PR_CREATED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
 
 
 class GitHubUser(BaseModel):
@@ -102,3 +115,72 @@ class GitHubInstallation(BaseModel):
     account_type: str = "User"
     repository_selection: str = "selected"
     permissions: dict = Field(default_factory=dict)
+
+
+class PublicationApproval(BaseModel):
+    """Immutable record of human authorization bound to an exact patch and target."""
+    model_config = ConfigDict(frozen=False)
+
+    id: str
+    repository_owner: str
+    repository_name: str
+    repository_id: str
+    task_id: str
+    chain_id: str
+    patch_id: str
+    patch_hash: str
+    base_commit_sha: str
+    target_base_branch: str
+    proposed_head_branch: str
+    verification_report_id: str
+    verification_run_id: str
+    approver_identity: Optional[str] = None
+    status: ApprovalStatus = ApprovalStatus.AWAITING_APPROVAL
+    invalidation_reason: Optional[str] = None
+    created_at: str
+    approved_at: Optional[str] = None
+    expires_at: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class PublicationRun(BaseModel):
+    """Execution telemetry for a patch publication workflow."""
+    model_config = ConfigDict(frozen=False)
+
+    id: str
+    approval_id: str
+    task_id: str
+    chain_id: str
+    repository_owner: str
+    repository_name: str
+    head_branch: str
+    base_branch: str
+    base_commit_sha: str
+    head_commit_sha: Optional[str] = None
+    pull_request_number: Optional[int] = None
+    pull_request_url: Optional[str] = None
+    status: ApprovalStatus = ApprovalStatus.PUBLISHING
+    attempt_count: int = 1
+    error_message: Optional[str] = None
+    started_at: str
+    completed_at: Optional[str] = None
+
+
+class PublishedPullRequest(BaseModel):
+    """Persisted outcome of an approved PR publication."""
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    run_id: str
+    approval_id: str
+    repository_owner: str
+    repository_name: str
+    pr_number: int
+    html_url: str
+    title: str
+    body: str
+    head_branch: str
+    base_branch: str
+    head_sha: str
+    base_sha: str
+    created_at: str

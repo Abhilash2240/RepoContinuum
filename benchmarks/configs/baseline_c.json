@@ -1,0 +1,15 @@
+{
+  "baseline_id": "baseline_c_full_repocontinuum",
+  "name": "Full RepoContinuum Workflow",
+  "description": "Complete RepoContinuum system: repository intelligence indexing, DAG dependency planning, persistent obligation ledger, isolated verification, active regression gates, and bounded repair loop.",
+  "features": {
+    "repository_indexing": true,
+    "dag_planning": true,
+    "persistent_task_state": true,
+    "obligation_ledger": true,
+    "regression_checking": true,
+    "bounded_repair_loop": true
+  },
+  "max_attempts_per_task": 3,
+  "context_window_chars": 16000
+}

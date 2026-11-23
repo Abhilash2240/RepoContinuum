@@ -4,7 +4,7 @@ RepoContinuum is a local-first, repository-aware software maintenance assistant 
 
 ---
 
-## Current Status: Milestones 1, 2, 3, 4, and 5 Complete
+## Current Status: All Six Milestones Complete (Milestones 1–6)
 
 - **Milestone 1 (Repository Intelligence Foundation):**
   - Walks repository files with strict path-traversal and symlink escape checks.
@@ -48,6 +48,18 @@ RepoContinuum is a local-first, repository-aware software maintenance assistant 
   - HMAC-SHA256 webhook signature verification (`X-Hub-Signature-256`) with `hmac.compare_digest`.
   - Webhook delivery idempotency with `X-GitHub-Delivery` tracking in database.
   - Safe import of GitHub issues into task chains wrapped in `<UNTRUSTED_REPOSITORY_DATA source="github_issue">` boundary tags.
+
+- **Milestone 6 (Approved PR Publishing & Benchmark Evaluation):**
+  - Separate GitHub write publisher (`BaseGitHubPublisher` / `LiveGitHubPublisher` / `FakeGitHubPublisher`) restricted strictly to branch creation, commit publishing, and PR creation.
+  - Prohibited methods (`merge_pull_request`, `delete_branch`, `force_push`, etc.) omitted from the publisher interface and verified via automated reflection tests.
+  - Cryptographic patch-hash (SHA-256) and base-commit binding via `PublicationApproval` and `PublicationApprovalPolicy`.
+  - Immediate invalidation of approvals if patch hash changes, base commit moves, target branch differs, approval expires, or verification detects regressions.
+  - Standardized PR descriptions including task description, changed files, verification evidence, regression status, limitations, and reproducibility metadata.
+  - Idempotent branch and PR publishing with network retry resilience.
+  - Zero auto-merge and zero auto-deployment guarantees.
+  - Reproducible benchmark evaluation harness (`benchmarks/`): 10 multi-task chains (22 sequential maintenance tasks) across 3 comparable ablation baselines (A: Isolated, B: Planning Only, C: Full RepoContinuum).
+  - Explicit reporting of all 12 evaluation metrics with transparent numerators and denominators.
+  - Dashboard views for Publication Review (`PublicationReviewPage`) and Benchmark Dashboard (`BenchmarkDashboardPage`).
 
 ---
 
@@ -257,4 +269,44 @@ Once started, open [http://127.0.0.1:8000](http://127.0.0.1:8000) in your browse
 - **Agent Telemetry:** Step-by-step LLM run traces, prompt/completion token usage, and latency.
 - **Verification Evidence Viewer:** Test check outcomes, pass/fail results, and formatted Markdown reports.
 - **GitHub Read Explorer:** Read-only access to GitHub App installations, repositories, issues, and pull requests, with safe one-click import into task chains.
+- **Publication Review:** Human approval gate showing cryptographic patch SHA-256 hash, base commit SHA, target branch, verification verdict, zero-regression status, PR markdown preview, and one-click publishing.
+- **Benchmark Dashboard:** Comparative ablation metrics across Baselines A, B, and C with on-demand experiment trigger and markdown report viewer.
+
+---
+
+## Approved GitHub Pull Request Publishing (Milestone 6)
+
+Manage human approvals and publish verified maintenance patches to GitHub:
+
+```powershell
+# 1. Request publication approval for a verified task
+repocontinuum publish request --task <task_id> --chain <chain_id> --patch <patch_id> --run <vrun_id> --owner <owner> --repo <repo>
+
+# 2. Inspect pending publication approvals
+repocontinuum publish status
+
+# 3. Explicit human approval grant (binds to exact patch hash and base commit)
+repocontinuum publish approve --approval <approval_id> --approver "senior-eng@company.com" --hours 48
+
+# 4. Publish approved patch as GitHub Pull Request (idempotent, no auto-merge)
+repocontinuum publish run --approval <approval_id>
+
+# 5. Revoke approval if needed prior to publication
+repocontinuum publish revoke --approval <approval_id> --revoker "eng-lead@company.com" --reason "Design review requested changes"
+```
+
+---
+
+## Benchmark Evaluation Harness (Milestone 6)
+
+Run the reproducible benchmark evaluation across the 10-chain corpus (22 tasks) and compare baselines:
+
+```powershell
+# Run evaluation across all three baselines (A: Isolated, B: Planning, C: Full RepoContinuum)
+repocontinuum benchmark run --baseline all --seed 42
+
+# View the formatted comparative Markdown evaluation report
+repocontinuum benchmark report
+```
+
 

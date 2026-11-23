@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from repocontinuum.domain.planning import ActorType, MaintenanceTask
 from repocontinuum.github.client import BaseGitHubClient
-from repocontinuum.planning.service import TaskChainService
+
+if TYPE_CHECKING:
+    from repocontinuum.planning.service import TaskChainService
 
 
 class GitHubSyncService:

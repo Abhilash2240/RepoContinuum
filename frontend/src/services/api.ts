@@ -1,5 +1,7 @@
 import {
   AgentRun,
+  BenchmarkRun,
+  BenchmarkSummary,
   CodeSymbol,
   DAGGraph,
   DashboardSummary,
@@ -8,6 +10,9 @@ import {
   GitHubPullRequest,
   GitHubRepo,
   Obligation,
+  PublicationApproval,
+  PublicationRun,
+  PublishedPullRequest,
   RepositorySummary,
   TaskChainSummary,
   VerificationRun,
@@ -88,4 +93,74 @@ export const api = {
 
   getGitHubPullRequests: (owner: string, repo: string, state: string = 'open') =>
     fetchJson<GitHubPullRequest[]>(`${API_BASE}/github/repositories/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls?state=${state}`),
+
+  // Publication endpoints
+  getApprovals: (taskId?: string) => {
+    const q = taskId ? `?task_id=${encodeURIComponent(taskId)}` : '';
+    return fetchJson<PublicationApproval[]>(`${API_BASE}/publications/approvals${q}`);
+  },
+
+  getApproval: (approvalId: string) =>
+    fetchJson<PublicationApproval>(`${API_BASE}/publications/approvals/${encodeURIComponent(approvalId)}`),
+
+  requestApproval: (payload: {
+    task_id: string;
+    chain_id: string;
+    patch_id: string;
+    verification_run_id: string;
+    repo_owner: string;
+    repo_name: string;
+    target_base_branch?: string;
+  }) =>
+    fetchJson<PublicationApproval>(`${API_BASE}/publications/approvals/request`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }),
+
+  approvePublication: (approvalId: string, approverIdentity: string, validityHours: number = 24) =>
+    fetchJson<PublicationApproval>(`${API_BASE}/publications/approvals/${encodeURIComponent(approvalId)}/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ approver_identity: approverIdentity, validity_hours: validityHours }),
+    }),
+
+  revokeApproval: (approvalId: string, revokerIdentity: string, reason: string) =>
+    fetchJson<PublicationApproval>(`${API_BASE}/publications/approvals/${encodeURIComponent(approvalId)}/revoke`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ revoker_identity: revokerIdentity, reason: reason }),
+    }),
+
+  publishApprovedPatch: (approvalId: string, requireRealSandbox: boolean = false) =>
+    fetchJson<PublishedPullRequest>(`${API_BASE}/publications/approvals/${encodeURIComponent(approvalId)}/publish`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ require_real_sandbox: requireRealSandbox }),
+    }),
+
+  getPublicationRuns: (approvalId?: string) => {
+    const q = approvalId ? `?approval_id=${encodeURIComponent(approvalId)}` : '';
+    return fetchJson<PublicationRun[]>(`${API_BASE}/publications/runs${q}`);
+  },
+
+  getPublishedPullRequests: () =>
+    fetchJson<PublishedPullRequest[]>(`${API_BASE}/publications/pull-requests`),
+
+  // Benchmark endpoints
+  getBenchmarkSummary: () =>
+    fetchJson<BenchmarkSummary>(`${API_BASE}/benchmarks/summary`),
+
+  getBenchmarkReport: () =>
+    fetchJson<{ markdown: string }>(`${API_BASE}/benchmarks/report`),
+
+  getBenchmarkRuns: () =>
+    fetchJson<BenchmarkRun[]>(`${API_BASE}/benchmarks/runs`),
+
+  triggerBenchmark: (baseline: string = 'all', seed: number = 42) =>
+    fetchJson<BenchmarkSummary>(`${API_BASE}/benchmarks/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ baseline, seed }),
+    }),
 };

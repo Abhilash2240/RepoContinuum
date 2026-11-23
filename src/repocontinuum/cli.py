@@ -74,6 +74,20 @@ dashboard_app = typer.Typer(
 )
 app.add_typer(dashboard_app)
 
+publish_app = typer.Typer(
+    name="publish",
+    help="Approved GitHub pull-request publishing",
+    add_completion=False,
+)
+app.add_typer(publish_app)
+
+benchmark_app = typer.Typer(
+    name="benchmark",
+    help="Benchmark evaluation harness and metrics",
+    add_completion=False,
+)
+app.add_typer(benchmark_app)
+
 console = Console()
 
 
@@ -965,6 +979,196 @@ def dashboard_run(
     import uvicorn
     console.print(f"[bold green]Starting RepoContinuum Dashboard on http://{host}:{port}[/bold green]")
     uvicorn.run("repocontinuum.api.app:app", host=host, port=port, reload=reload)
+
+
+# ================= Publication Commands =================
+
+def _get_publication_service():
+    from repocontinuum.github.config import GitHubSettings
+    from repocontinuum.github.auth import GitHubAppAuthManager
+    from repocontinuum.github.publisher import FakeGitHubPublisher, LiveGitHubPublisher
+    from repocontinuum.github.publication_service import PublicationService
+
+    db = DatabaseManager()
+    db.create_tables()
+    repo = TaskChainRepository(db)
+    settings = GitHubSettings()
+    if settings.mock_mode or not settings.is_configured():
+        publisher = FakeGitHubPublisher()
+    else:
+        auth_mgr = GitHubAppAuthManager(settings)
+        publisher = LiveGitHubPublisher(auth_mgr, settings)
+    return PublicationService(repository=repo, publisher=publisher)
+
+
+@publish_app.command(name="request")
+def publish_request_cmd(
+    task_id: str = typer.Option(..., "--task", "-t", help="Target task ID"),
+    chain_id: str = typer.Option(..., "--chain", "-c", help="Task chain ID"),
+    patch_id: str = typer.Option(..., "--patch", "-p", help="Verified patch ID"),
+    vrun_id: str = typer.Option(..., "--vrun", "-v", help="Verification run ID"),
+    repo_owner: str = typer.Option(..., "--owner", "-o", help="GitHub repository owner"),
+    repo_name: str = typer.Option(..., "--repo", "-r", help="GitHub repository name"),
+    base_branch: str = typer.Option("main", "--base", "-b", help="Target base branch (default: main)"),
+) -> None:
+    """Request publication approval for an isolated verified patch."""
+    service = _get_publication_service()
+    try:
+        approval = service.request_approval(
+            task_id=task_id,
+            chain_id=chain_id,
+            patch_id=patch_id,
+            verification_run_id=vrun_id,
+            repo_owner=repo_owner,
+            repo_name=repo_name,
+            target_base_branch=base_branch,
+        )
+        console.print(Panel(
+            f"[bold green]Publication Approval Requested[/bold green]\n\n"
+            f"[bold]Approval ID:[/bold] {approval.id}\n"
+            f"[bold]Repository:[/bold] {approval.repository_id}\n"
+            f"[bold]Target Base:[/bold] {approval.target_base_branch}\n"
+            f"[bold]Proposed Head:[/bold] {approval.proposed_head_branch}\n"
+            f"[bold]Patch Hash:[/bold] {approval.patch_hash}\n"
+            f"[bold]Status:[/bold] {approval.status.value}",
+            title="[bold cyan]Publication Approval Record[/bold cyan]",
+            border_style="cyan",
+        ))
+    except Exception as exc:
+        console.print(f"[bold red]Failed to create approval request:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+
+@publish_app.command(name="approve")
+def publish_approve_cmd(
+    approval_id: str = typer.Option(..., "--approval", "-a", help="Approval ID"),
+    approver: str = typer.Option(..., "--approver", "-u", help="Approver identity or email"),
+    validity_hours: int = typer.Option(24, "--validity-hours", help="Approval validity in hours"),
+) -> None:
+    """Grant explicit human authorization to publish an approved patch."""
+    service = _get_publication_service()
+    try:
+        approval = service.grant_approval(
+            approval_id=approval_id,
+            approver_identity=approver,
+            validity_hours=validity_hours,
+        )
+        console.print(f"[bold green]✓ Approved publication {approval.id} by {approver} (expires at: {approval.expires_at})[/bold green]")
+    except Exception as exc:
+        console.print(f"[bold red]Approval failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+
+@publish_app.command(name="revoke")
+def publish_revoke_cmd(
+    approval_id: str = typer.Option(..., "--approval", "-a", help="Approval ID"),
+    reason: str = typer.Option(..., "--reason", "-m", help="Reason for revocation"),
+    revoker: str = typer.Option("reviewer", "--revoker", help="Revoker identity"),
+) -> None:
+    """Revoke a previously granted publication approval."""
+    service = _get_publication_service()
+    try:
+        approval = service.revoke_approval(approval_id=approval_id, revoker=revoker, reason=reason)
+        console.print(f"[bold yellow]✓ Approval {approval.id} revoked ({approval.invalidation_reason})[/bold yellow]")
+    except Exception as exc:
+        console.print(f"[bold red]Revocation failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+
+@publish_app.command(name="run")
+def publish_run_cmd(
+    approval_id: str = typer.Option(..., "--approval", "-a", help="Valid approval ID"),
+    require_real_sandbox: bool = typer.Option(False, "--require-real-sandbox", help="Enforce real Docker sandbox execution requirement"),
+) -> None:
+    """Execute approved publication, creating branch and opening GitHub Pull Request."""
+    service = _get_publication_service()
+    with console.status("[bold blue]Publishing approved patch to GitHub...[/bold blue]"):
+        try:
+            pr = service.publish_approved_task(approval_id=approval_id, require_real_sandbox=require_real_sandbox)
+        except Exception as exc:
+            console.print(f"[bold red]Publication failed:[/bold red] {exc}")
+            raise typer.Exit(code=1)
+
+    console.print(Panel(
+        f"[bold green]✓ Pull Request Successfully Published[/bold green]\n\n"
+        f"[bold]PR URL:[/bold] [link={pr.html_url}]{pr.html_url}[/link]\n"
+        f"[bold]PR Number:[/bold] #{pr.pr_number}\n"
+        f"[bold]Title:[/bold] {pr.title}\n"
+        f"[bold]Head Branch:[/bold] {pr.head_branch} ({pr.head_sha[:10]})\n"
+        f"[bold]Base Branch:[/bold] {pr.base_branch} ({pr.base_sha[:10]})\n",
+        title="[bold green]RepoContinuum Publication Result[/bold green]",
+        border_style="green",
+    ))
+
+
+@publish_app.command(name="status")
+def publish_status_cmd(
+    approval_id: str = typer.Option(..., "--approval", "-a", help="Approval ID"),
+) -> None:
+    """Inspect status of an approval record and associated runs."""
+    service = _get_publication_service()
+    approval = service.repo.get_publication_approval(approval_id)
+    if not approval:
+        console.print(f"[bold red]Approval '{approval_id}' not found.[/bold red]")
+        raise typer.Exit(code=1)
+
+    table = Table(title=f"Publication Approval {approval.id}")
+    table.add_column("Property", style="cyan")
+    table.add_column("Value")
+
+    table.add_row("Status", approval.status.value)
+    table.add_row("Repository", approval.repository_id)
+    table.add_row("Task ID", approval.task_id)
+    table.add_row("Patch Hash", approval.patch_hash)
+    table.add_row("Base SHA", approval.base_commit_sha)
+    table.add_row("Proposed Branch", approval.proposed_head_branch)
+    table.add_row("Target Branch", approval.target_base_branch)
+    table.add_row("Approver", approval.approver_identity or "None")
+    table.add_row("Approved At", approval.approved_at or "N/A")
+    table.add_row("Expires At", approval.expires_at or "N/A")
+    if approval.invalidation_reason:
+        table.add_row("Invalidation Reason", approval.invalidation_reason)
+
+    console.print(table)
+
+
+# ================= Benchmark Commands =================
+
+@benchmark_app.command(name="run")
+def benchmark_run_cmd(
+    manifest_path: Path = typer.Option(Path("benchmarks/manifest.yaml"), "--manifest", "-m", help="Path to manifest YAML"),
+    configs_dir: Path = typer.Option(Path("benchmarks/configs"), "--configs", "-c", help="Path to baseline configs"),
+    output_dir: Path = typer.Option(Path("benchmarks/results"), "--output", "-o", help="Output directory"),
+    seed: int = typer.Option(42, "--seed", "-s", help="Random seed for deterministic runs"),
+) -> None:
+    """Run reproducible benchmark evaluation across all baselines."""
+    from benchmarks.run_experiment import run_benchmark
+
+    console.print("[bold blue]Starting RepoContinuum Multi-Task Maintenance Benchmark...[/bold blue]")
+    try:
+        run_benchmark(
+            manifest_path=manifest_path,
+            configs_dir=configs_dir,
+            output_dir=output_dir,
+            seed=seed,
+        )
+        console.print(f"[bold green]✓ Benchmark complete! Summary and report written to {output_dir}[/bold green]")
+    except Exception as exc:
+        console.print(f"[bold red]Benchmark run failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+
+@benchmark_app.command(name="report")
+def benchmark_report_cmd(
+    results_dir: Path = typer.Option(Path("benchmarks/results"), "--results", "-r", help="Path to benchmark results"),
+) -> None:
+    """Display the summary of the latest benchmark run."""
+    report_file = results_dir / "report.md"
+    if not report_file.exists():
+        console.print(f"[bold red]Report not found at {report_file}. Run benchmark first.[/bold red]")
+        raise typer.Exit(code=1)
+
+    console.print(report_file.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

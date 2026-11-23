@@ -2,7 +2,7 @@
 
 **Plan Version:** 1.0  
 **Baseline Date:** 21 November 2026  
-**Status:** Milestones 1, 2, 3, 4, and 5 Complete (Phase 0, Milestone 1, Milestone 2, Milestone 3, Milestone 4, Milestone 5 Complete)  
+**Status:** All Six Milestones Complete (Phase 0, Milestone 1, Milestone 2, Milestone 3, Milestone 4, Milestone 5, Milestone 6 Complete)  
 **Target Platform:** Windows / Python 3.13 (Docker Desktop/Linux containers for sandboxing)
 
 ---
@@ -21,16 +21,16 @@ RepoContinuum follows a strict milestone-driven, test-first, human-controlled de
 [Milestone 2: Task Chains & Obligation Ledger] ──> COMPLETE
              │
              ▼
-[Milestone 3: Patch & Isolated Verification Loop] ──> COMPLETE ◄── DELIVERED
+[Milestone 3: Patch & Isolated Verification Loop] ──> COMPLETE
              │
              ▼
-[Milestone 4: LLM Provider & Bounded Agent] ───> COMPLETE ◄─── DELIVERED
+[Milestone 4: LLM Provider & Bounded Agent] ───> COMPLETE
              │
              ▼
-[Milestone 5: Dashboard & GitHub Read Integration] ───> COMPLETE ◄─── DELIVERED
+[Milestone 5: Dashboard & GitHub Read Integration] ───> COMPLETE
              │
              ▼
-[Milestone 6: Approved PR Publication & Benchmarking]
+[Milestone 6: Approved PR Publication & Benchmarking] ───> COMPLETE ◄─── DELIVERED
 ```
 
 ---
@@ -324,4 +324,57 @@ Deliver an isolated verification pipeline that safely parses, validates, and has
 - API Chains & GitHub Tests: `tests/api/test_api_chains_and_github.py`.
 - API Agent & Verification Tests: `tests/api/test_api_agent_verification_runs.py`.
 - End-to-End Dashboard & API Tests: `tests/integration/test_dashboard_e2e.py`.
+
+---
+
+## 8. Milestone 6 — Approved PR Publishing and Benchmark Evaluation
+
+### Objectives
+- Introduce a separate, tightly controlled write publisher (`BaseGitHubPublisher` / `LiveGitHubPublisher` / `FakeGitHubPublisher`) for GitHub PR publication.
+- Implement cryptographic patch-hash and base-ref binding via `PublicationApproval` and `PublicationApprovalPolicy`.
+- Disallow auto-merging, auto-deployment, and prohibited repository mutations by strict interface definition and automated test verification.
+- Enforce approval invalidation upon patch drift, base SHA drift, branch mismatch, expiration, or regression detection.
+- Build a reproducible benchmark evaluation harness with 10 controlled issue chains (22 sequential maintenance tasks) and 3 ablation baselines.
+- Calculate all 12 mandatory evaluation metrics with explicit numerators and denominators.
+- Extend the web dashboard with `PublicationReviewPage` and `BenchmarkDashboardPage`.
+- Provide full CLI commands for publication approvals, publishing runs, and benchmark execution.
+
+### Completed Deliverables
+1. **GitHub Publisher & Invalidation Engine (`src/repocontinuum/github/`)**:
+   - `BaseGitHubPublisher` (ABC with zero administrative/merge methods).
+   - `FakeGitHubPublisher` (deterministic test double) and `LiveGitHubPublisher` (REST/Git Database API).
+   - `PublicationApprovalPolicy`: strictly validates patch SHA-256, base commit SHA, target branch, verification report conclusions, and regression status.
+   - `PublicationService`: handles approval requests, human approval grant, approval revocation, branch creation, commit publishing, PR description synthesis, and PR publication with idempotent retry.
+2. **Database Persistence & Alembic Migration (`src/repocontinuum/persistence/`, `migrations/`)**:
+   - Tables: `publication_approvals`, `publication_runs`, `published_pull_requests`, `benchmark_runs`.
+   - Migration `0005_publication_and_benchmark_schema.py` verified with zero schema drift.
+3. **Reproducible Benchmark Evaluation Harness (`benchmarks/`)**:
+   - `manifest.yaml`: 10 multi-task chains, 22 tasks total, complete with expected outcomes and acceptance criteria.
+   - Baseline configs: `baseline_a.json` (Isolated), `baseline_b.json` (Planning Only), `baseline_c.json` (Full RepoContinuum).
+   - `evaluator.py`: Implements all 12 mandatory metrics with numerators and denominators.
+   - `run_experiment.py`: Runs evaluations, saving raw JSON results, `summary.json`, and formatted `report.md`.
+   - `protocol.md`: Comprehensive evaluation protocol.
+4. **FastAPI Endpoints (`src/repocontinuum/api/routes/`)**:
+   - `/api/v1/publications/approvals`, `/approvals/request`, `/approvals/{id}/approve`, `/approvals/{id}/revoke`, `/approvals/{id}/publish`.
+   - `/api/v1/publications/runs`, `/api/v1/publications/pull-requests`.
+   - `/api/v1/benchmarks/summary`, `/api/v1/benchmarks/report`, `/api/v1/benchmarks/runs`, `/api/v1/benchmarks/run`.
+5. **Frontend Single-Page Application (`frontend/`)**:
+   - `PublicationReviewPage`: Human approval review, binding manifest display, cryptographic patch SHA validation, PR publishing, and publication history.
+   - `BenchmarkDashboardPage`: KPI metric cards, comparative ablation table, report viewer, and on-demand trigger.
+   - Verified clean production build with Vite (`dist/assets/index-BVCRxVVs.js`).
+6. **CLI Commands (`src/repocontinuum/cli.py`)**:
+   - `repocontinuum publish request`, `approve`, `revoke`, `run`, `status`.
+   - `repocontinuum benchmark run`, `report`.
+7. **Architecture Decision Record (`docs/adr/0005-approved-pr-publishing-and-benchmark-evaluation.md`)**:
+   - Formally documented separate publisher interface, invalidation gates, no auto-merge, and benchmark evaluation protocol.
+
+### Test Suite (162 Passed, 2 Skipped, 0 Failed)
+- Publisher Interface Tests: `tests/unit/test_github_publisher.py` (5 passed).
+- Publication Approval & Invalidation Tests: `tests/unit/test_publication_approval.py` (7 passed).
+- Benchmark Evaluator Tests: `tests/unit/test_benchmark_evaluator.py` (2 passed).
+- Publication REST API Tests: `tests/api/test_api_publication.py` (2 passed).
+- Benchmark REST API Tests: `tests/api/test_api_benchmarks.py` (2 passed).
+- End-to-End Publication Workflow Tests: `tests/integration/test_publication_e2e.py` (1 passed).
+- Full regression suite across Milestones 1-6: 162 passed, 2 skipped (Docker stopped, Gemini API key offline).
+
 

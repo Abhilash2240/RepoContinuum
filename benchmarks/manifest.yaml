@@ -1,0 +1,312 @@
+version: "1.0"
+benchmark_id: "repocontinuum_long_horizon_v1"
+description: "Reproducible evaluation corpus for long-horizon multi-task repository maintenance."
+created_at: "2026-11-21T21:00:00Z"
+license: "MIT"
+default_repository: "repocontinuum-bench/benchmark-fixtures"
+default_base_commit_sha: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"
+
+chains:
+  - chain_id: "chn-01-calc-precision"
+    title: "Arbitrary-Precision Financial Math & Formatting"
+    description: "Series of dependent tasks updating currency calculation, rounding modes, and tabular receipt formatting."
+    base_commit_sha: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"
+    tasks:
+      - task_id: "t1-calc-decimal"
+        title: "Migrate float calculations to Decimal"
+        description: "Replace standard IEEE-754 binary floats with Decimal arithmetic in financial_math.py."
+        predecessor_ids: []
+        acceptance_criteria:
+          - "Decimal precision test suite passes"
+          - "Zero floating-point rounding epsilon"
+        verifier_ref: "tests/bench/test_math.py:test_decimal_precision"
+        expected_changed_files: ["src/calculator/financial_math.py"]
+        active_obligations: ["ob-t1-precision"]
+        impacted_test_labels: ["test_decimal_precision", "test_overflow"]
+        characteristics: ["independent", "precision_critical"]
+      - task_id: "t2-calc-rounding"
+        title: "Add banker rounding support"
+        description: "Implement ROUND_HALF_EVEN rounding strategy based on Decimal context."
+        predecessor_ids: ["t1-calc-decimal"]
+        acceptance_criteria:
+          - "Bankers rounding satisfies monetary standard"
+          - "Preserves decimal precision from task 1"
+        verifier_ref: "tests/bench/test_math.py:test_bankers_rounding"
+        expected_changed_files: ["src/calculator/rounding.py"]
+        active_obligations: ["ob-t2-rounding"]
+        impacted_test_labels: ["test_bankers_rounding", "test_decimal_precision"]
+        characteristics: ["strongly_dependent", "regression_sensitive"]
+      - task_id: "t3-calc-format"
+        title: "Format localized receipt currency"
+        description: "Format Decimal outputs using locale-specific grouping and currency symbols."
+        predecessor_ids: ["t2-calc-rounding"]
+        acceptance_criteria:
+          - "Currency rendered with correct symbol and decimal commas/points"
+          - "Rounding from task 2 must not be overridden"
+        verifier_ref: "tests/bench/test_math.py:test_currency_formatting"
+        expected_changed_files: ["src/calculator/formatters.py"]
+        active_obligations: ["ob-t3-format"]
+        impacted_test_labels: ["test_currency_formatting", "test_bankers_rounding"]
+        characteristics: ["strongly_dependent", "regression_sensitive"]
+
+  - chain_id: "chn-02-auth-tokens"
+    title: "Secure Session and JWT Token Lifecycle"
+    description: "Multi-step maintenance upgrading token signature verification, refresh rotation, and revocation blacklists."
+    base_commit_sha: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"
+    tasks:
+      - task_id: "t1-auth-signature"
+        title: "Enforce RS256 token verification"
+        description: "Reject HS256 and None algorithm tokens; require public key RS256 signature verification."
+        predecessor_ids: []
+        acceptance_criteria:
+          - "HS256 tokens rejected with 401 Unauthorized"
+          - "Valid RS256 token correctly decoded"
+        verifier_ref: "tests/bench/test_auth.py:test_rs256_verification"
+        expected_changed_files: ["src/auth/jwt_validator.py"]
+        active_obligations: ["ob-t1-rs256"]
+        impacted_test_labels: ["test_rs256_verification", "test_token_tampering"]
+        characteristics: ["security_critical"]
+      - task_id: "t2-auth-rotation"
+        title: "Implement refresh token rotation"
+        description: "Issue single-use refresh tokens that invalidate previous tokens upon exchange."
+        predecessor_ids: ["t1-auth-signature"]
+        acceptance_criteria:
+          - "Reuse of previous refresh token revokes all child tokens"
+          - "RS256 access token verification remains strict"
+        verifier_ref: "tests/bench/test_auth.py:test_refresh_rotation"
+        expected_changed_files: ["src/auth/refresh_service.py"]
+        active_obligations: ["ob-t2-rotation"]
+        impacted_test_labels: ["test_refresh_rotation", "test_rs256_verification"]
+        characteristics: ["strongly_dependent", "regression_sensitive"]
+
+  - chain_id: "chn-03-cache-invalidation"
+    title: "Multi-Tiered Cache Invalidation"
+    description: "Distributed cache invalidation across L1 in-memory and L2 Redis storage."
+    base_commit_sha: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"
+    tasks:
+      - task_id: "t1-l1-eviction"
+        title: "Implement LRU eviction for L1 memory cache"
+        description: "Add bound capacity and least-recently-used eviction policy to L1Cache."
+        predecessor_ids: []
+        acceptance_criteria:
+          - "Memory footprint capped at configured max_entries"
+        verifier_ref: "tests/bench/test_cache.py:test_lru_eviction"
+        expected_changed_files: ["src/cache/l1_cache.py"]
+        active_obligations: ["ob-t1-lru"]
+        impacted_test_labels: ["test_lru_eviction", "test_concurrent_reads"]
+        characteristics: ["independent"]
+      - task_id: "t2-l2-invalidation-bus"
+        title: "Broadcast pub/sub cache purge events"
+        description: "Emit purge events to Redis channel and invalidate local L1 entries upon receipt."
+        predecessor_ids: ["t1-l1-eviction"]
+        acceptance_criteria:
+          - "Purge event clears corresponding entry from L1 without dropping unaffected cache"
+          - "LRU cap in L1 must remain enforced"
+        verifier_ref: "tests/bench/test_cache.py:test_distributed_purge"
+        expected_changed_files: ["src/cache/pubsub.py", "src/cache/manager.py"]
+        active_obligations: ["ob-t2-pubsub"]
+        impacted_test_labels: ["test_distributed_purge", "test_lru_eviction"]
+        characteristics: ["shared_modules", "regression_sensitive"]
+
+  - chain_id: "chn-04-matrix-ops"
+    title: "Sparse Matrix Operations"
+    description: "Numerical sparse matrix storage, transpose, and scalar multiplication."
+    base_commit_sha: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"
+    tasks:
+      - task_id: "t1-matrix-sparse"
+        title: "Implement CSR (Compressed Sparse Row) storage"
+        description: "Store non-zero matrix elements in data, indices, and indptr arrays."
+        predecessor_ids: []
+        acceptance_criteria:
+          - "Elements indexed correctly in O(1) row lookups"
+        verifier_ref: "tests/bench/test_matrix.py:test_csr_storage"
+        expected_changed_files: ["src/math/sparse_matrix.py"]
+        active_obligations: ["ob-t1-csr"]
+        impacted_test_labels: ["test_csr_storage"]
+        characteristics: ["independent"]
+      - task_id: "t2-matrix-transpose"
+        title: "Implement transpose operation"
+        description: "Convert CSR matrix to transposed CSC format."
+        predecessor_ids: ["t1-matrix-sparse"]
+        acceptance_criteria:
+          - "M.transpose().transpose() == M"
+          - "Non-zero count invariant preserved"
+        verifier_ref: "tests/bench/test_matrix.py:test_transpose"
+        expected_changed_files: ["src/math/operations.py"]
+        active_obligations: ["ob-t2-transpose"]
+        impacted_test_labels: ["test_transpose", "test_csr_storage"]
+        characteristics: ["strongly_dependent"]
+
+  - chain_id: "chn-05-config-parser"
+    title: "Hierarchical Configuration Parser"
+    description: "Safe YAML/JSON parsing with environment variable substitution and schema validation."
+    base_commit_sha: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"
+    tasks:
+      - task_id: "t1-env-substitution"
+        title: "Support ${ENV_VAR} substitution in strings"
+        description: "Expand environment variables in configuration strings with optional default values."
+        predecessor_ids: []
+        acceptance_criteria:
+          - "Valid variables substituted; missing variables with defaults use default"
+        verifier_ref: "tests/bench/test_config.py:test_env_expansion"
+        expected_changed_files: ["src/config/interpolator.py"]
+        active_obligations: ["ob-t1-env"]
+        impacted_test_labels: ["test_env_expansion"]
+        characteristics: ["independent"]
+      - task_id: "t2-schema-type-coercion"
+        title: "Strict schema validation and type coercion"
+        description: "Validate coerced types (int, bool, float) against declared schema."
+        predecessor_ids: ["t1-env-substitution"]
+        acceptance_criteria:
+          - "Substituted strings properly coerced to schema types"
+          - "Invalid coercions raise descriptive ConfigError"
+        verifier_ref: "tests/bench/test_config.py:test_schema_validation"
+        expected_changed_files: ["src/config/schema.py"]
+        active_obligations: ["ob-t2-schema"]
+        impacted_test_labels: ["test_schema_validation", "test_env_expansion"]
+        characteristics: ["strongly_dependent", "regression_sensitive"]
+
+  - chain_id: "chn-06-retry-budget"
+    title: "Resilient HTTP Client with Token-Bucket Retry"
+    description: "Exponential backoff client with token-bucket rate limiting."
+    base_commit_sha: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"
+    tasks:
+      - task_id: "t1-exp-backoff"
+        title: "Implement truncated exponential backoff"
+        description: "Calculate retry delays with jitter and maximum cap."
+        predecessor_ids: []
+        acceptance_criteria:
+          - "Delay increases exponentially up to max_delay_seconds"
+        verifier_ref: "tests/bench/test_client.py:test_backoff"
+        expected_changed_files: ["src/client/backoff.py"]
+        active_obligations: ["ob-t1-backoff"]
+        impacted_test_labels: ["test_backoff"]
+        characteristics: ["independent"]
+      - task_id: "t2-retry-budget"
+        title: "Implement token bucket retry budget"
+        description: "Limit total retries to 10% of total successful requests."
+        predecessor_ids: ["t1-exp-backoff"]
+        acceptance_criteria:
+          - "Retry attempts rejected once token bucket is exhausted"
+          - "Exponential backoff calculation preserved"
+        verifier_ref: "tests/bench/test_client.py:test_retry_budget"
+        expected_changed_files: ["src/client/budget.py"]
+        active_obligations: ["ob-t2-budget"]
+        impacted_test_labels: ["test_retry_budget", "test_backoff"]
+        characteristics: ["strongly_dependent", "regression_sensitive"]
+
+  - chain_id: "chn-07-serializer"
+    title: "Extensible Binary Serializer"
+    description: "Custom binary serialization with schema versioning and backward compatibility."
+    base_commit_sha: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"
+    tasks:
+      - task_id: "t1-varint-encoding"
+        title: "Implement variable-length integer encoding"
+        description: "Encode integers into 7-bit payload bytes with MSB continuation flag."
+        predecessor_ids: []
+        acceptance_criteria:
+          - "Integers 0..2^63 encode and decode roundtrip cleanly"
+        verifier_ref: "tests/bench/test_binary.py:test_varint"
+        expected_changed_files: ["src/binary/varint.py"]
+        active_obligations: ["ob-t1-varint"]
+        impacted_test_labels: ["test_varint"]
+        characteristics: ["independent"]
+      - task_id: "t2-schema-versioning"
+        title: "Add schema header with version tag"
+        description: "Prefix payloads with version magic bytes; support v1 backward compatibility."
+        predecessor_ids: ["t1-varint-encoding"]
+        acceptance_criteria:
+          - "v1 payloads still decoded using varint encoder"
+          - "v2 payloads support optional fields"
+        verifier_ref: "tests/bench/test_binary.py:test_versioning"
+        expected_changed_files: ["src/binary/protocol.py"]
+        active_obligations: ["ob-t2-versioning"]
+        impacted_test_labels: ["test_versioning", "test_varint"]
+        characteristics: ["strongly_dependent", "regression_sensitive"]
+
+  - chain_id: "chn-08-symlink-guard"
+    title: "Filesystem Path Security and Symlink Containment"
+    description: "Strict path boundary containment preventing path traversal and symlink escapes."
+    base_commit_sha: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"
+    tasks:
+      - task_id: "t1-path-traversal-guard"
+        title: "Block relative traversal escape sequences"
+        description: "Reject paths containing '..' that resolve outside repository root."
+        predecessor_ids: []
+        acceptance_criteria:
+          - "Paths attempting escape raise SecurityPathError"
+        verifier_ref: "tests/bench/test_fs.py:test_traversal"
+        expected_changed_files: ["src/fs/path_validator.py"]
+        active_obligations: ["ob-t1-traversal"]
+        impacted_test_labels: ["test_traversal"]
+        characteristics: ["security_critical"]
+      - task_id: "t2-symlink-target-check"
+        title: "Verify real target of symlinks"
+        description: "Check canonical destination of symlinks before opening."
+        predecessor_ids: ["t1-path-traversal-guard"]
+        acceptance_criteria:
+          - "Symlinks pointing outside sandbox rejected"
+          - "Standard traversal check from task 1 remains active"
+        verifier_ref: "tests/bench/test_fs.py:test_symlink_escape"
+        expected_changed_files: ["src/fs/symlink_guard.py"]
+        active_obligations: ["ob-t2-symlink"]
+        impacted_test_labels: ["test_symlink_escape", "test_traversal"]
+        characteristics: ["strongly_dependent", "regression_sensitive"]
+
+  - chain_id: "chn-09-event-bus"
+    title: "Asynchronous Event Dispatcher"
+    description: "In-memory event bus with typed subscribers and error boundary filters."
+    base_commit_sha: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"
+    tasks:
+      - task_id: "t1-event-dispatcher"
+        title: "Implement typed event subscription"
+        description: "Dispatch events to registered handlers based on event subclass."
+        predecessor_ids: []
+        acceptance_criteria:
+          - "Subscribers receive matching event instances in registration order"
+        verifier_ref: "tests/bench/test_events.py:test_dispatch"
+        expected_changed_files: ["src/events/dispatcher.py"]
+        active_obligations: ["ob-t1-dispatch"]
+        impacted_test_labels: ["test_dispatch"]
+        characteristics: ["independent"]
+      - task_id: "t2-error-boundary"
+        title: "Isolate subscriber exceptions"
+        description: "Wrap handler execution so exceptions in one handler do not block remaining subscribers."
+        predecessor_ids: ["t1-event-dispatcher"]
+        acceptance_criteria:
+          - "All healthy subscribers notified even if one raises an exception"
+          - "Dispatch order from task 1 preserved"
+        verifier_ref: "tests/bench/test_events.py:test_error_isolation"
+        expected_changed_files: ["src/events/error_boundary.py"]
+        active_obligations: ["ob-t2-error-boundary"]
+        impacted_test_labels: ["test_error_isolation", "test_dispatch"]
+        characteristics: ["strongly_dependent", "regression_sensitive"]
+
+  - chain_id: "chn-10-query-builder"
+    title: "SQL AST Query Builder"
+    description: "Composable query builder with parameter binding and dialect formatting."
+    base_commit_sha: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"
+    tasks:
+      - task_id: "t1-parameter-sanitizer"
+        title: "Enforce parameterized variable binding"
+        description: "Replace literals with positional parameter tokens (? or $1) to prevent SQL injection."
+        predecessor_ids: []
+        acceptance_criteria:
+          - "Literals extracted into separate parameters list"
+        verifier_ref: "tests/bench/test_sql.py:test_parameter_binding"
+        expected_changed_files: ["src/sql/sanitizer.py"]
+        active_obligations: ["ob-t1-sql-bind"]
+        impacted_test_labels: ["test_parameter_binding"]
+        characteristics: ["security_critical"]
+      - task_id: "t2-join-clauses"
+        title: "Support chained JOIN clauses"
+        description: "Compose INNER JOIN and LEFT JOIN AST nodes with ON conditions."
+        predecessor_ids: ["t1-parameter-sanitizer"]
+        acceptance_criteria:
+          - "Generated SQL maintains parameter placeholders"
+          - "Parameter binding from task 1 remains active"
+        verifier_ref: "tests/bench/test_sql.py:test_joins"
+        expected_changed_files: ["src/sql/builder.py"]
+        active_obligations: ["ob-t2-joins"]
+        impacted_test_labels: ["test_joins", "test_parameter_binding"]
+        characteristics: ["strongly_dependent", "regression_sensitive"]

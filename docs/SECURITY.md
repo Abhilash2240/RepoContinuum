@@ -103,6 +103,36 @@ Security in RepoContinuum is a core product capability, not a cosmetic post-impl
 
 ---
 
-## 7. Reporting Security Vulnerabilities
+## 7. GitHub Write Capability & Publication Security (Milestone 6)
+
+1. **Strict Interface Separation (Least Privilege):**
+   - GitHub read operations and write operations are strictly decoupled into separate interfaces: `BaseGitHubClient` (read) and `BaseGitHubPublisher` (write).
+   - The publisher exposes strictly 4 authorized methods: branch creation, commit publication, pull request creation, and pull request retrieval.
+   - Prohibited administrative methods (`merge_pull_request`, `delete_branch`, `force_push`, `close_issue`, `update_repository_settings`) are omitted from the interface and enforced via automated test assertions.
+   - Automatic merging and automatic deployment logic is strictly forbidden and absent from the codebase.
+
+2. **Cryptographic Artifact Binding:**
+   - Publication cannot proceed without an explicit, immutable `PublicationApproval` record.
+   - The approval cryptographically binds the exact SHA-256 patch content hash, exact 40-character base commit SHA, target base branch, target repository, and associated verification report ID.
+   - If any parameter differs at publication time, the approval is immediately invalidated and publication is rejected.
+
+3. **Approval Invalidation and Stale State Defense:**
+   - Approvals feature configurable expiration timestamps (`expires_at`). Expired approvals are rejected.
+   - An approval is invalidated if the underlying verification report contains regression warnings, failed test checks, or non-PASSED conclusions.
+   - Approvals can be manually revoked at any time prior to publication.
+
+4. **Disposable Token Handling and Credential Isolation:**
+   - Publication uses short-lived installation access tokens scoped strictly to the target repository.
+   - Access tokens are never logged, never exposed to client-side browser JavaScript, and never stored in plain text.
+   - Git operations use isolated temporary credentials or direct GitHub Git Database APIs without exposing secrets in command lines or process listings.
+
+5. **Deterministic Branch Namespaces & Idempotency:**
+   - Branches are created in a controlled namespace: `repocontinuum/task-<short_id>-<short_hash>`.
+   - Branch names are strictly sanitized against shell and git injection characters.
+   - Network retries and duplicate publication calls are idempotent: existing branches and pull requests are safely retrieved without creating duplicates or overwriting unrelated branches.
+
+---
+
+## 8. Reporting Security Vulnerabilities
 
 To report a vulnerability in RepoContinuum, submit a detailed report to the repository maintainer with reproduction steps. Do not open public issues for unpatched vulnerabilities.

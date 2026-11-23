@@ -1,0 +1,389 @@
+{
+  "benchmark_id": "repocontinuum_long_horizon_v1",
+  "executed_at": "2026-11-23T06:41:12.618843+00:00",
+  "total_chains_in_corpus": 10,
+  "seed": 99,
+  "baselines": {
+    "baseline_a_isolated_issue": {
+      "name": "Isolated Issue Baseline (No Memory)",
+      "total_chains": 10,
+      "completed_chains": 0,
+      "total_tasks": 21,
+      "successful_tasks": 7,
+      "metrics": {
+        "task_success_rate": {
+          "metric_name": "Task Success Rate",
+          "value": 0.3333,
+          "numerator": 7,
+          "denominator": 21,
+          "sample_size": 21,
+          "unit": "ratio",
+          "description": "Tasks satisfying acceptance criteria divided by attempted tasks"
+        },
+        "task_chain_completion_rate": {
+          "metric_name": "Task-Chain Completion Rate",
+          "value": 0.0,
+          "numerator": 0,
+          "denominator": 10,
+          "sample_size": 10,
+          "unit": "ratio",
+          "description": "Chains where all sequential tasks pass divided by attempted chains"
+        },
+        "regression_rate": {
+          "metric_name": "Regression Rate",
+          "value": 0.3333,
+          "numerator": 4,
+          "denominator": 12,
+          "sample_size": 12,
+          "unit": "ratio",
+          "description": "Earlier obligations failing after later changes divided by rechecked obligations"
+        },
+        "regression_free_chain_rate": {
+          "metric_name": "Regression-Free Chain Rate",
+          "value": 0.6,
+          "numerator": 6,
+          "denominator": 10,
+          "sample_size": 10,
+          "unit": "ratio",
+          "description": "Completed chains with zero broken earlier obligations divided by attempted chains"
+        },
+        "retained_functionality_at_checkpoint": {
+          "metric_name": "Retained Functionality at Checkpoint",
+          "value": 0.6667,
+          "numerator": 8,
+          "denominator": 12,
+          "sample_size": 12,
+          "unit": "ratio",
+          "description": "Earlier obligations still passing after each subsequent task"
+        },
+        "conformance_to_active_requirements": {
+          "metric_name": "Conformance to Active Requirements",
+          "value": 0.5882,
+          "numerator": 20,
+          "denominator": 34,
+          "sample_size": 34,
+          "unit": "ratio",
+          "description": "Currently active acceptance requirements passing at task checkpoints"
+        },
+        "test_selection_precision": {
+          "metric_name": "Test Selection Precision",
+          "value": 0.2658,
+          "numerator": 21,
+          "denominator": 79,
+          "sample_size": 79,
+          "unit": "ratio",
+          "description": "Selected tests labeled impacted divided by all selected tests"
+        },
+        "test_selection_recall": {
+          "metric_name": "Test Selection Recall",
+          "value": 0.6,
+          "numerator": 21,
+          "denominator": 35,
+          "sample_size": 35,
+          "unit": "ratio",
+          "description": "Impacted tests selected divided by all labeled impacted tests"
+        },
+        "patch_acceptance_rate": {
+          "metric_name": "Patch Acceptance Rate",
+          "value": 0.3333,
+          "numerator": 7,
+          "denominator": 21,
+          "sample_size": 21,
+          "unit": "ratio",
+          "description": "Patches satisfying verification without regressions divided by attempted tasks"
+        },
+        "repair_attempts_avg": {
+          "metric_name": "Average Repair Attempts",
+          "value": 0.0,
+          "numerator": 0,
+          "denominator": 21,
+          "sample_size": 21,
+          "unit": "attempts/task",
+          "description": "Total automated repair iterations divided by total tasks"
+        },
+        "median_latency_seconds": {
+          "metric_name": "Median Task Latency",
+          "value": 6.61,
+          "numerator": 6.61,
+          "denominator": 1,
+          "sample_size": 21,
+          "unit": "seconds",
+          "description": "Median execution latency per maintenance task"
+        },
+        "p95_latency_seconds": {
+          "metric_name": "p95 Task Latency",
+          "value": 8.75,
+          "numerator": 8.75,
+          "denominator": 1,
+          "sample_size": 21,
+          "unit": "seconds",
+          "description": "95th percentile execution latency per maintenance task"
+        },
+        "cost_per_successful_task": {
+          "metric_name": "Cost per Successful Task",
+          "value": 0.0109,
+          "numerator": 0.0766,
+          "denominator": 7,
+          "sample_size": 7,
+          "unit": "USD",
+          "description": "Total LLM and compute cost divided by count of successful tasks"
+        }
+      },
+      "raw_results_file": "results\\raw\\baseline_a_isolated_issue_raw.json"
+    },
+    "baseline_b_repo_planning": {
+      "name": "Repository-Aware Planning (DAG Only)",
+      "total_chains": 10,
+      "completed_chains": 6,
+      "total_tasks": 21,
+      "successful_tasks": 17,
+      "metrics": {
+        "task_success_rate": {
+          "metric_name": "Task Success Rate",
+          "value": 0.8095,
+          "numerator": 17,
+          "denominator": 21,
+          "sample_size": 21,
+          "unit": "ratio",
+          "description": "Tasks satisfying acceptance criteria divided by attempted tasks"
+        },
+        "task_chain_completion_rate": {
+          "metric_name": "Task-Chain Completion Rate",
+          "value": 0.6,
+          "numerator": 6,
+          "denominator": 10,
+          "sample_size": 10,
+          "unit": "ratio",
+          "description": "Chains where all sequential tasks pass divided by attempted chains"
+        },
+        "regression_rate": {
+          "metric_name": "Regression Rate",
+          "value": 0.25,
+          "numerator": 3,
+          "denominator": 12,
+          "sample_size": 12,
+          "unit": "ratio",
+          "description": "Earlier obligations failing after later changes divided by rechecked obligations"
+        },
+        "regression_free_chain_rate": {
+          "metric_name": "Regression-Free Chain Rate",
+          "value": 0.7,
+          "numerator": 7,
+          "denominator": 10,
+          "sample_size": 10,
+          "unit": "ratio",
+          "description": "Completed chains with zero broken earlier obligations divided by attempted chains"
+        },
+        "retained_functionality_at_checkpoint": {
+          "metric_name": "Retained Functionality at Checkpoint",
+          "value": 0.75,
+          "numerator": 9,
+          "denominator": 12,
+          "sample_size": 12,
+          "unit": "ratio",
+          "description": "Earlier obligations still passing after each subsequent task"
+        },
+        "conformance_to_active_requirements": {
+          "metric_name": "Conformance to Active Requirements",
+          "value": 0.8824,
+          "numerator": 30,
+          "denominator": 34,
+          "sample_size": 34,
+          "unit": "ratio",
+          "description": "Currently active acceptance requirements passing at task checkpoints"
+        },
+        "test_selection_precision": {
+          "metric_name": "Test Selection Precision",
+          "value": 0.9459,
+          "numerator": 35,
+          "denominator": 37,
+          "sample_size": 37,
+          "unit": "ratio",
+          "description": "Selected tests labeled impacted divided by all selected tests"
+        },
+        "test_selection_recall": {
+          "metric_name": "Test Selection Recall",
+          "value": 1.0,
+          "numerator": 35,
+          "denominator": 35,
+          "sample_size": 35,
+          "unit": "ratio",
+          "description": "Impacted tests selected divided by all labeled impacted tests"
+        },
+        "patch_acceptance_rate": {
+          "metric_name": "Patch Acceptance Rate",
+          "value": 0.8095,
+          "numerator": 17,
+          "denominator": 21,
+          "sample_size": 21,
+          "unit": "ratio",
+          "description": "Patches satisfying verification without regressions divided by attempted tasks"
+        },
+        "repair_attempts_avg": {
+          "metric_name": "Average Repair Attempts",
+          "value": 0.0,
+          "numerator": 0,
+          "denominator": 21,
+          "sample_size": 21,
+          "unit": "attempts/task",
+          "description": "Total automated repair iterations divided by total tasks"
+        },
+        "median_latency_seconds": {
+          "metric_name": "Median Task Latency",
+          "value": 10.28,
+          "numerator": 10.28,
+          "denominator": 1,
+          "sample_size": 21,
+          "unit": "seconds",
+          "description": "Median execution latency per maintenance task"
+        },
+        "p95_latency_seconds": {
+          "metric_name": "p95 Task Latency",
+          "value": 13.61,
+          "numerator": 13.61,
+          "denominator": 1,
+          "sample_size": 21,
+          "unit": "seconds",
+          "description": "95th percentile execution latency per maintenance task"
+        },
+        "cost_per_successful_task": {
+          "metric_name": "Cost per Successful Task",
+          "value": 0.0076,
+          "numerator": 0.13,
+          "denominator": 17,
+          "sample_size": 17,
+          "unit": "USD",
+          "description": "Total LLM and compute cost divided by count of successful tasks"
+        }
+      },
+      "raw_results_file": "results\\raw\\baseline_b_repo_planning_raw.json"
+    },
+    "baseline_c_full_repocontinuum": {
+      "name": "Full RepoContinuum Workflow",
+      "total_chains": 10,
+      "completed_chains": 10,
+      "total_tasks": 21,
+      "successful_tasks": 21,
+      "metrics": {
+        "task_success_rate": {
+          "metric_name": "Task Success Rate",
+          "value": 1.0,
+          "numerator": 21,
+          "denominator": 21,
+          "sample_size": 21,
+          "unit": "ratio",
+          "description": "Tasks satisfying acceptance criteria divided by attempted tasks"
+        },
+        "task_chain_completion_rate": {
+          "metric_name": "Task-Chain Completion Rate",
+          "value": 1.0,
+          "numerator": 10,
+          "denominator": 10,
+          "sample_size": 10,
+          "unit": "ratio",
+          "description": "Chains where all sequential tasks pass divided by attempted chains"
+        },
+        "regression_rate": {
+          "metric_name": "Regression Rate",
+          "value": 0.0,
+          "numerator": 0,
+          "denominator": 12,
+          "sample_size": 12,
+          "unit": "ratio",
+          "description": "Earlier obligations failing after later changes divided by rechecked obligations"
+        },
+        "regression_free_chain_rate": {
+          "metric_name": "Regression-Free Chain Rate",
+          "value": 1.0,
+          "numerator": 10,
+          "denominator": 10,
+          "sample_size": 10,
+          "unit": "ratio",
+          "description": "Completed chains with zero broken earlier obligations divided by attempted chains"
+        },
+        "retained_functionality_at_checkpoint": {
+          "metric_name": "Retained Functionality at Checkpoint",
+          "value": 1.0,
+          "numerator": 12,
+          "denominator": 12,
+          "sample_size": 12,
+          "unit": "ratio",
+          "description": "Earlier obligations still passing after each subsequent task"
+        },
+        "conformance_to_active_requirements": {
+          "metric_name": "Conformance to Active Requirements",
+          "value": 1.0,
+          "numerator": 34,
+          "denominator": 34,
+          "sample_size": 34,
+          "unit": "ratio",
+          "description": "Currently active acceptance requirements passing at task checkpoints"
+        },
+        "test_selection_precision": {
+          "metric_name": "Test Selection Precision",
+          "value": 0.8333,
+          "numerator": 35,
+          "denominator": 42,
+          "sample_size": 42,
+          "unit": "ratio",
+          "description": "Selected tests labeled impacted divided by all selected tests"
+        },
+        "test_selection_recall": {
+          "metric_name": "Test Selection Recall",
+          "value": 1.0,
+          "numerator": 35,
+          "denominator": 35,
+          "sample_size": 35,
+          "unit": "ratio",
+          "description": "Impacted tests selected divided by all labeled impacted tests"
+        },
+        "patch_acceptance_rate": {
+          "metric_name": "Patch Acceptance Rate",
+          "value": 1.0,
+          "numerator": 21,
+          "denominator": 21,
+          "sample_size": 21,
+          "unit": "ratio",
+          "description": "Patches satisfying verification without regressions divided by attempted tasks"
+        },
+        "repair_attempts_avg": {
+          "metric_name": "Average Repair Attempts",
+          "value": 0.29,
+          "numerator": 6,
+          "denominator": 21,
+          "sample_size": 21,
+          "unit": "attempts/task",
+          "description": "Total automated repair iterations divided by total tasks"
+        },
+        "median_latency_seconds": {
+          "metric_name": "Median Task Latency",
+          "value": 18.28,
+          "numerator": 18.28,
+          "denominator": 1,
+          "sample_size": 21,
+          "unit": "seconds",
+          "description": "Median execution latency per maintenance task"
+        },
+        "p95_latency_seconds": {
+          "metric_name": "p95 Task Latency",
+          "value": 24.28,
+          "numerator": 24.28,
+          "denominator": 1,
+          "sample_size": 21,
+          "unit": "seconds",
+          "description": "95th percentile execution latency per maintenance task"
+        },
+        "cost_per_successful_task": {
+          "metric_name": "Cost per Successful Task",
+          "value": 0.0102,
+          "numerator": 0.2133,
+          "denominator": 21,
+          "sample_size": 21,
+          "unit": "USD",
+          "description": "Total LLM and compute cost divided by count of successful tasks"
+        }
+      },
+      "raw_results_file": "results\\raw\\baseline_c_full_repocontinuum_raw.json"
+    }
+  }
+}

@@ -10,9 +10,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from repocontinuum.api.routes.agent_runs import router as agent_runs_router
+from repocontinuum.api.routes.benchmarks import router as benchmarks_router
 from repocontinuum.api.routes.chains import router as chains_router
 from repocontinuum.api.routes.dashboard import router as dashboard_router
 from repocontinuum.api.routes.github import router as github_router
+from repocontinuum.api.routes.publication import router as publication_router
 from repocontinuum.api.routes.repositories import router as repositories_router
 from repocontinuum.api.routes.verification_runs import router as verification_runs_router
 from repocontinuum.api.routes.webhooks import router as webhooks_router
@@ -58,6 +60,8 @@ def create_app() -> FastAPI:
     app.include_router(verification_runs_router, prefix="/api/v1")
     app.include_router(github_router, prefix="/api/v1")
     app.include_router(webhooks_router, prefix="/api/v1")
+    app.include_router(publication_router, prefix="/api/v1")
+    app.include_router(benchmarks_router, prefix="/api/v1")
 
     # Serve built React frontend if available
     frontend_dist = Path(__file__).resolve().parent.parent.parent.parent / "frontend" / "dist"

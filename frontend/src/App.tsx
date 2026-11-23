@@ -7,6 +7,8 @@ import { ObligationsPage } from './pages/ObligationsPage';
 import { AgentRunsPage } from './pages/AgentRunsPage';
 import { VerificationViewerPage } from './pages/VerificationViewerPage';
 import { GitHubExplorerPage } from './pages/GitHubExplorerPage';
+import { PublicationReviewPage } from './pages/PublicationReviewPage';
+import { BenchmarkDashboardPage } from './pages/BenchmarkDashboardPage';
 import { api } from './services/api';
 
 export const App: React.FC = () => {
@@ -57,7 +59,7 @@ export const App: React.FC = () => {
               RepoContinuum
             </h1>
             <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
-              Maintenance Agent Dashboard · Milestone 5
+              Maintenance Agent Dashboard · Milestone 6 (Final)
             </div>
           </div>
         </div>
@@ -67,7 +69,7 @@ export const App: React.FC = () => {
             <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#10b981' }} />
             <span style={{ color: '#94a3b8' }}>API Online (127.0.0.1:8000)</span>
           </div>
-          <span className="badge badge-purple font-mono">v0.1.0</span>
+          <span className="badge badge-purple font-mono">v1.0.0</span>
         </div>
       </header>
 
@@ -85,11 +87,13 @@ export const App: React.FC = () => {
         {activeTab === 'agent-runs' && <AgentRunsPage />}
         {activeTab === 'verification' && <VerificationViewerPage />}
         {activeTab === 'github' && <GitHubExplorerPage />}
+        {activeTab === 'publication' && <PublicationReviewPage />}
+        {activeTab === 'benchmarks' && <BenchmarkDashboardPage />}
       </main>
 
       {/* Footer */}
       <footer style={{ borderTop: '1px solid #1e293b', padding: '1rem 1.5rem', textAlign: 'center', fontSize: '0.75rem', color: '#64748b' }}>
-        RepoContinuum · Local-first, repository-aware software maintenance agent · Read-only GitHub App architecture
+        RepoContinuum · Local-first, repository-aware software maintenance agent · Approved PR Publishing & Benchmark Evaluation
       </footer>
     </div>
   );

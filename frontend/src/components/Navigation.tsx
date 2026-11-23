@@ -7,6 +7,8 @@ import {
   Bot,
   FileCheck2,
   Github,
+  GitPullRequest,
+  BarChart3,
 } from 'lucide-react';
 
 export type NavTab =
@@ -16,7 +18,9 @@ export type NavTab =
   | 'obligations'
   | 'agent-runs'
   | 'verification'
-  | 'github';
+  | 'github'
+  | 'publication'
+  | 'benchmarks';
 
 interface NavigationProps {
   activeTab: NavTab;
@@ -34,7 +38,7 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, onSelectTab, 
     { id: 'verification', label: 'Patches & Verification', icon: <FileCheck2 size={18} /> },
     {
       id: 'github',
-      label: 'GitHub Integration',
+      label: 'GitHub Read',
       icon: (
         <span style={{ position: 'relative', display: 'inline-flex' }}>
           <Github size={18} />
@@ -54,6 +58,8 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, onSelectTab, 
         </span>
       ),
     },
+    { id: 'publication', label: 'PR Publishing', icon: <GitPullRequest size={18} /> },
+    { id: 'benchmarks', label: 'Benchmarks', icon: <BarChart3 size={18} /> },
   ];
 
   return (

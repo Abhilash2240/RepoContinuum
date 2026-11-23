@@ -1,0 +1,15 @@
+{
+  "baseline_id": "baseline_a_isolated_issue",
+  "name": "Isolated Issue Baseline (No Memory)",
+  "description": "Treats each task independently with fresh context. No cross-task dependency memory, no persistent obligation ledger, no regression checking.",
+  "features": {
+    "repository_indexing": false,
+    "dag_planning": false,
+    "persistent_task_state": false,
+    "obligation_ledger": false,
+    "regression_checking": false,
+    "bounded_repair_loop": false
+  },
+  "max_attempts_per_task": 1,
+  "context_window_chars": 8000
+}

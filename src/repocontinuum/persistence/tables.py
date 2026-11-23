@@ -245,3 +245,93 @@ class GitHubWebhookDeliveryTable(Base):
     payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     processed_at: Mapped[str] = mapped_column(String(64), nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="processed", nullable=False)
+
+
+class PublicationApprovalTable(Base):
+    """Stores human approval decisions bound to exact patch and target."""
+
+    __tablename__ = "publication_approvals"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    repository_owner: Mapped[str] = mapped_column(String(128), nullable=False)
+    repository_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    repository_id: Mapped[str] = mapped_column(String(256), nullable=False)
+    task_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    chain_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    patch_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    patch_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    base_commit_sha: Mapped[str] = mapped_column(String(64), nullable=False)
+    target_base_branch: Mapped[str] = mapped_column(String(128), nullable=False)
+    proposed_head_branch: Mapped[str] = mapped_column(String(256), nullable=False)
+    verification_report_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    verification_run_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    approver_identity: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="AWAITING_APPROVAL", nullable=False)
+    invalidation_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[str] = mapped_column(String(64), nullable=False)
+    approved_at: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    expires_at: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    approval_metadata: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+
+
+class PublicationRunTable(Base):
+    """Tracks publication executions and GitHub remote mutations."""
+
+    __tablename__ = "publication_runs"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    approval_id: Mapped[str] = mapped_column(String(64), ForeignKey("publication_approvals.id"), nullable=False)
+    task_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    chain_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    repository_owner: Mapped[str] = mapped_column(String(128), nullable=False)
+    repository_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    head_branch: Mapped[str] = mapped_column(String(256), nullable=False)
+    base_branch: Mapped[str] = mapped_column(String(128), nullable=False)
+    base_commit_sha: Mapped[str] = mapped_column(String(64), nullable=False)
+    head_commit_sha: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    pull_request_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    pull_request_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    attempt_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[str] = mapped_column(String(64), nullable=False)
+    completed_at: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+class PublishedPullRequestTable(Base):
+    """Stores permanent references to successfully published pull requests."""
+
+    __tablename__ = "published_pull_requests"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    run_id: Mapped[str] = mapped_column(String(64), ForeignKey("publication_runs.id"), nullable=False)
+    approval_id: Mapped[str] = mapped_column(String(64), ForeignKey("publication_approvals.id"), nullable=False)
+    repository_owner: Mapped[str] = mapped_column(String(128), nullable=False)
+    repository_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    pr_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    html_url: Mapped[str] = mapped_column(String(512), nullable=False)
+    title: Mapped[str] = mapped_column(String(256), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    head_branch: Mapped[str] = mapped_column(String(256), nullable=False)
+    base_branch: Mapped[str] = mapped_column(String(128), nullable=False)
+    head_sha: Mapped[str] = mapped_column(String(64), nullable=False)
+    base_sha: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[str] = mapped_column(String(64), nullable=False)
+
+
+class BenchmarkRunTable(Base):
+    """Stores benchmark experiment executions and aggregate metrics."""
+
+    __tablename__ = "benchmark_runs"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    baseline: Mapped[str] = mapped_column(String(64), nullable=False)
+    corpus_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    total_chains: Mapped[int] = mapped_column(Integer, nullable=False)
+    completed_chains: Mapped[int] = mapped_column(Integer, nullable=False)
+    total_tasks: Mapped[int] = mapped_column(Integer, nullable=False)
+    successful_tasks: Mapped[int] = mapped_column(Integer, nullable=False)
+    regressions_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    metrics: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    raw_results_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    executed_at: Mapped[str] = mapped_column(String(64), nullable=False)

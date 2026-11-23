@@ -215,3 +215,116 @@ export interface GitHubPullRequest {
   created_at: string;
   updated_at: string;
 }
+
+export type ApprovalStatus =
+  | 'AWAITING_APPROVAL'
+  | 'APPROVED'
+  | 'INVALIDATED'
+  | 'PUBLISHING'
+  | 'BRANCH_CREATED'
+  | 'PR_CREATED'
+  | 'FAILED'
+  | 'CANCELLED';
+
+export interface PublicationApproval {
+  id: string;
+  repository_owner: string;
+  repository_name: string;
+  repository_id: string;
+  task_id: string;
+  chain_id: string;
+  patch_id: string;
+  patch_hash: string;
+  base_commit_sha: string;
+  target_base_branch: string;
+  proposed_head_branch: string;
+  verification_report_id: string;
+  verification_run_id: string;
+  approver_identity?: string | null;
+  status: ApprovalStatus;
+  invalidation_reason?: string | null;
+  created_at: string;
+  approved_at?: string | null;
+  expires_at?: string | null;
+  metadata?: Record<string, any>;
+}
+
+export interface PublicationRun {
+  id: string;
+  approval_id: string;
+  task_id: string;
+  chain_id: string;
+  repository_owner: string;
+  repository_name: string;
+  head_branch: string;
+  base_branch: string;
+  base_commit_sha: string;
+  head_commit_sha?: string | null;
+  pull_request_number?: number | null;
+  pull_request_url?: string | null;
+  status: ApprovalStatus;
+  attempt_count: number;
+  error_message?: string | null;
+  started_at: string;
+  completed_at?: string | null;
+}
+
+export interface PublishedPullRequest {
+  id: string;
+  run_id: string;
+  approval_id: string;
+  repository_owner: string;
+  repository_name: string;
+  pr_number: number;
+  html_url: string;
+  title: string;
+  body: string;
+  head_branch: string;
+  base_branch: string;
+  head_sha: string;
+  base_sha: string;
+  created_at: string;
+}
+
+export interface MetricSummary {
+  metric_name: string;
+  value: number;
+  numerator: number;
+  denominator: number;
+  sample_size: number;
+  unit: string;
+  description: string;
+}
+
+export interface BenchmarkSummary {
+  benchmark_id: string;
+  executed_at: string;
+  total_chains_in_corpus: number;
+  seed: number;
+  baselines: Record<
+    string,
+    {
+      name: string;
+      total_chains: number;
+      completed_chains: number;
+      total_tasks: number;
+      successful_tasks: number;
+      metrics: Record<string, MetricSummary>;
+      raw_results_file: string;
+    }
+  >;
+}
+
+export interface BenchmarkRun {
+  id: string;
+  baseline: string;
+  corpus_id: string;
+  total_chains: number;
+  completed_chains: number;
+  total_tasks: number;
+  successful_tasks: number;
+  regressions_count: number;
+  metrics: Record<string, MetricSummary>;
+  raw_results_path?: string | null;
+  executed_at: string;
+}

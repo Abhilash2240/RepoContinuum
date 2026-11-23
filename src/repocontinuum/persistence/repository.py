@@ -39,16 +39,26 @@ from repocontinuum.domain.verification import (
 from repocontinuum.persistence.database import DatabaseManager
 from repocontinuum.persistence.tables import (
     AgentRunTable,
-    GitHubWebhookDeliveryTable,
     AuditEventTable,
+    BenchmarkRunTable,
     CheckpointTable,
     EvidenceReportTable,
+    GitHubWebhookDeliveryTable,
     MaintenanceTaskTable,
     ObligationTable,
     PatchTable,
+    PublicationApprovalTable,
+    PublicationRunTable,
+    PublishedPullRequestTable,
     TaskChainTable,
     TaskDependencyTable,
     VerificationRunTable,
+)
+from repocontinuum.github.models import (
+    ApprovalStatus,
+    PublicationApproval,
+    PublicationRun,
+    PublishedPullRequest,
 )
 
 
@@ -263,6 +273,11 @@ class TaskChainRepository:
             existing = session.get(PatchTable, patch.id)
             if existing:
                 existing.status = patch.status.value
+                existing.patch_hash = patch.patch_hash
+                existing.diff_content = patch.diff_content
+                existing.changed_paths = patch.changed_paths
+                existing.total_added_lines = patch.total_added_lines
+                existing.total_removed_lines = patch.total_removed_lines
             else:
                 record = PatchTable(
                     id=patch.id,
@@ -748,3 +763,285 @@ class TaskChainRepository:
                 "regressions_detected_recent": regression_count,
                 "registered_repositories": repo_ids,
             }
+
+    # ---------------- Publication Approvals & Runs ----------------
+
+    def save_publication_approval(self, approval: PublicationApproval) -> PublicationApproval:
+        """Create or update a publication approval record."""
+        with self.db.session_scope() as session:
+            existing = session.get(PublicationApprovalTable, approval.id)
+            if existing:
+                existing.status = approval.status.value
+                existing.approver_identity = approval.approver_identity
+                existing.approved_at = approval.approved_at
+                existing.expires_at = approval.expires_at
+                existing.invalidation_reason = approval.invalidation_reason
+                existing.approval_metadata = approval.metadata
+            else:
+                record = PublicationApprovalTable(
+                    id=approval.id,
+                    repository_owner=approval.repository_owner,
+                    repository_name=approval.repository_name,
+                    repository_id=approval.repository_id,
+                    task_id=approval.task_id,
+                    chain_id=approval.chain_id,
+                    patch_id=approval.patch_id,
+                    patch_hash=approval.patch_hash,
+                    base_commit_sha=approval.base_commit_sha,
+                    target_base_branch=approval.target_base_branch,
+                    proposed_head_branch=approval.proposed_head_branch,
+                    verification_report_id=approval.verification_report_id,
+                    verification_run_id=approval.verification_run_id,
+                    approver_identity=approval.approver_identity,
+                    status=approval.status.value,
+                    invalidation_reason=approval.invalidation_reason,
+                    created_at=approval.created_at,
+                    approved_at=approval.approved_at,
+                    expires_at=approval.expires_at,
+                    approval_metadata=approval.metadata,
+                )
+                session.add(record)
+        return approval
+
+    def get_publication_approval(self, approval_id: str) -> Optional[PublicationApproval]:
+        """Retrieve a publication approval record by ID."""
+        with self.db.session_scope() as session:
+            record = session.get(PublicationApprovalTable, approval_id)
+            if not record:
+                return None
+            return self._to_approval_model(record)
+
+    def list_publication_approvals(self, task_id: Optional[str] = None) -> List[PublicationApproval]:
+        """List publication approval records, optionally filtered by task."""
+        with self.db.session_scope() as session:
+            stmt = select(PublicationApprovalTable)
+            if task_id:
+                stmt = stmt.where(PublicationApprovalTable.task_id == task_id)
+            stmt = stmt.order_by(PublicationApprovalTable.created_at.desc())
+            records = session.scalars(stmt).all()
+            return [self._to_approval_model(r) for r in records]
+
+    def _to_approval_model(self, record: PublicationApprovalTable) -> PublicationApproval:
+        return PublicationApproval(
+            id=record.id,
+            repository_owner=record.repository_owner,
+            repository_name=record.repository_name,
+            repository_id=record.repository_id,
+            task_id=record.task_id,
+            chain_id=record.chain_id,
+            patch_id=record.patch_id,
+            patch_hash=record.patch_hash,
+            base_commit_sha=record.base_commit_sha,
+            target_base_branch=record.target_base_branch,
+            proposed_head_branch=record.proposed_head_branch,
+            verification_report_id=record.verification_report_id,
+            verification_run_id=record.verification_run_id,
+            approver_identity=record.approver_identity,
+            status=ApprovalStatus(record.status),
+            invalidation_reason=record.invalidation_reason,
+            created_at=record.created_at,
+            approved_at=record.approved_at,
+            expires_at=record.expires_at,
+            metadata=record.approval_metadata or {},
+        )
+
+    def save_publication_run(self, run: PublicationRun) -> PublicationRun:
+        """Create or update a publication execution record."""
+        with self.db.session_scope() as session:
+            existing = session.get(PublicationRunTable, run.id)
+            if existing:
+                existing.status = run.status.value
+                existing.head_commit_sha = run.head_commit_sha
+                existing.pull_request_number = run.pull_request_number
+                existing.pull_request_url = run.pull_request_url
+                existing.attempt_count = run.attempt_count
+                existing.error_message = run.error_message
+                existing.completed_at = run.completed_at
+            else:
+                record = PublicationRunTable(
+                    id=run.id,
+                    approval_id=run.approval_id,
+                    task_id=run.task_id,
+                    chain_id=run.chain_id,
+                    repository_owner=run.repository_owner,
+                    repository_name=run.repository_name,
+                    head_branch=run.head_branch,
+                    base_branch=run.base_branch,
+                    base_commit_sha=run.base_commit_sha,
+                    head_commit_sha=run.head_commit_sha,
+                    pull_request_number=run.pull_request_number,
+                    pull_request_url=run.pull_request_url,
+                    status=run.status.value,
+                    attempt_count=run.attempt_count,
+                    error_message=run.error_message,
+                    started_at=run.started_at,
+                    completed_at=run.completed_at,
+                )
+                session.add(record)
+        return run
+
+    def get_publication_run(self, run_id: str) -> Optional[PublicationRun]:
+        """Retrieve a publication run by ID."""
+        with self.db.session_scope() as session:
+            record = session.get(PublicationRunTable, run_id)
+            if not record:
+                return None
+            return self._to_publication_run_model(record)
+
+    def list_publication_runs(self, approval_id: Optional[str] = None) -> List[PublicationRun]:
+        """List publication runs ordered by started_at."""
+        with self.db.session_scope() as session:
+            stmt = select(PublicationRunTable)
+            if approval_id:
+                stmt = stmt.where(PublicationRunTable.approval_id == approval_id)
+            stmt = stmt.order_by(PublicationRunTable.started_at.desc())
+            records = session.scalars(stmt).all()
+            return [self._to_publication_run_model(r) for r in records]
+
+    def _to_publication_run_model(self, record: PublicationRunTable) -> PublicationRun:
+        return PublicationRun(
+            id=record.id,
+            approval_id=record.approval_id,
+            task_id=record.task_id,
+            chain_id=record.chain_id,
+            repository_owner=record.repository_owner,
+            repository_name=record.repository_name,
+            head_branch=record.head_branch,
+            base_branch=record.base_branch,
+            base_commit_sha=record.base_commit_sha,
+            head_commit_sha=record.head_commit_sha,
+            pull_request_number=record.pull_request_number,
+            pull_request_url=record.pull_request_url,
+            status=ApprovalStatus(record.status),
+            attempt_count=record.attempt_count,
+            error_message=record.error_message,
+            started_at=record.started_at,
+            completed_at=record.completed_at,
+        )
+
+    def save_published_pull_request(self, pr: PublishedPullRequest) -> PublishedPullRequest:
+        """Store a published pull request record."""
+        with self.db.session_scope() as session:
+            existing = session.get(PublishedPullRequestTable, pr.id)
+            if not existing:
+                record = PublishedPullRequestTable(
+                    id=pr.id,
+                    run_id=pr.run_id,
+                    approval_id=pr.approval_id,
+                    repository_owner=pr.repository_owner,
+                    repository_name=pr.repository_name,
+                    pr_number=pr.pr_number,
+                    html_url=pr.html_url,
+                    title=pr.title,
+                    body=pr.body,
+                    head_branch=pr.head_branch,
+                    base_branch=pr.base_branch,
+                    head_sha=pr.head_sha,
+                    base_sha=pr.base_sha,
+                    created_at=pr.created_at,
+                )
+                session.add(record)
+        return pr
+
+    def get_published_pull_request(self, pr_id: str) -> Optional[PublishedPullRequest]:
+        """Retrieve a published pull request record."""
+        with self.db.session_scope() as session:
+            record = session.get(PublishedPullRequestTable, pr_id)
+            if not record:
+                return None
+            return self._to_published_pr_model(record)
+
+    def list_published_pull_requests(self) -> List[PublishedPullRequest]:
+        """List all published pull requests ordered by creation time."""
+        with self.db.session_scope() as session:
+            stmt = select(PublishedPullRequestTable).order_by(PublishedPullRequestTable.created_at.desc())
+            records = session.scalars(stmt).all()
+            return [self._to_published_pr_model(r) for r in records]
+
+    def _to_published_pr_model(self, record: PublishedPullRequestTable) -> PublishedPullRequest:
+        return PublishedPullRequest(
+            id=record.id,
+            run_id=record.run_id,
+            approval_id=record.approval_id,
+            repository_owner=record.repository_owner,
+            repository_name=record.repository_name,
+            pr_number=record.pr_number,
+            html_url=record.html_url,
+            title=record.title,
+            body=record.body,
+            head_branch=record.head_branch,
+            base_branch=record.base_branch,
+            head_sha=record.head_sha,
+            base_sha=record.base_sha,
+            created_at=record.created_at,
+        )
+
+    # ---------------- Benchmark Runs ----------------
+
+    def save_benchmark_run(self, run_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Store benchmark experiment results."""
+        with self.db.session_scope() as session:
+            existing = session.get(BenchmarkRunTable, run_data["id"])
+            if existing:
+                existing.completed_chains = run_data.get("completed_chains", existing.completed_chains)
+                existing.successful_tasks = run_data.get("successful_tasks", existing.successful_tasks)
+                existing.regressions_count = run_data.get("regressions_count", existing.regressions_count)
+                existing.metrics = run_data.get("metrics", existing.metrics)
+            else:
+                record = BenchmarkRunTable(
+                    id=run_data["id"],
+                    baseline=run_data["baseline"],
+                    corpus_id=run_data.get("corpus_id", "controlled_corpus_v1"),
+                    total_chains=run_data.get("total_chains", 0),
+                    completed_chains=run_data.get("completed_chains", 0),
+                    total_tasks=run_data.get("total_tasks", 0),
+                    successful_tasks=run_data.get("successful_tasks", 0),
+                    regressions_count=run_data.get("regressions_count", 0),
+                    metrics=run_data.get("metrics", {}),
+                    raw_results_path=run_data.get("raw_results_path"),
+                    executed_at=run_data.get("executed_at", datetime.datetime.now(datetime.timezone.utc).isoformat()),
+                )
+                session.add(record)
+        return run_data
+
+    def get_benchmark_run(self, run_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieve benchmark run by ID."""
+        with self.db.session_scope() as session:
+            record = session.get(BenchmarkRunTable, run_id)
+            if not record:
+                return None
+            return {
+                "id": record.id,
+                "baseline": record.baseline,
+                "corpus_id": record.corpus_id,
+                "total_chains": record.total_chains,
+                "completed_chains": record.completed_chains,
+                "total_tasks": record.total_tasks,
+                "successful_tasks": record.successful_tasks,
+                "regressions_count": record.regressions_count,
+                "metrics": record.metrics,
+                "raw_results_path": record.raw_results_path,
+                "executed_at": record.executed_at,
+            }
+
+    def list_benchmark_runs(self) -> List[Dict[str, Any]]:
+        """List all benchmark runs ordered by executed_at."""
+        with self.db.session_scope() as session:
+            stmt = select(BenchmarkRunTable).order_by(BenchmarkRunTable.executed_at.desc())
+            records = session.scalars(stmt).all()
+            return [
+                {
+                    "id": r.id,
+                    "baseline": r.baseline,
+                    "corpus_id": r.corpus_id,
+                    "total_chains": r.total_chains,
+                    "completed_chains": r.completed_chains,
+                    "total_tasks": r.total_tasks,
+                    "successful_tasks": r.successful_tasks,
+                    "regressions_count": r.regressions_count,
+                    "metrics": r.metrics,
+                    "raw_results_path": r.raw_results_path,
+                    "executed_at": r.executed_at,
+                }
+                for r in records
+            ]

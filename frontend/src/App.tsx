@@ -14,11 +14,26 @@ import { api } from './services/api';
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTab>('overview');
   const [githubConnected, setGithubConnected] = useState(false);
+  const [apiOnline, setApiOnline] = useState<boolean | null>(null);
 
   useEffect(() => {
+    // Check GitHub status
     api.getGitHubStatus()
       .then((st) => setGithubConnected(Boolean(st.connected)))
       .catch(() => setGithubConnected(false));
+
+    // Check API health status
+    api.getDashboardSummary()
+      .then(() => setApiOnline(true))
+      .catch(() => setApiOnline(false));
+
+    const interval = setInterval(() => {
+      api.getDashboardSummary()
+        .then(() => setApiOnline(true))
+        .catch(() => setApiOnline(false));
+    }, 15000);
+
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -66,10 +81,23 @@ export const App: React.FC = () => {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.8rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#10b981' }} />
-            <span style={{ color: '#94a3b8' }}>API Online (127.0.0.1:8000)</span>
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                backgroundColor: apiOnline === true ? '#10b981' : apiOnline === false ? '#ef4444' : '#eab308',
+              }}
+            />
+            <span style={{ color: '#94a3b8' }}>
+              {apiOnline === true
+                ? 'API Online (127.0.0.1:8000)'
+                : apiOnline === false
+                ? 'API Offline'
+                : 'Connecting...'}
+            </span>
           </div>
-          <span className="badge badge-purple font-mono">v1.0.0</span>
+          <span className="badge badge-purple font-mono">v0.1.0</span>
         </div>
       </header>
 

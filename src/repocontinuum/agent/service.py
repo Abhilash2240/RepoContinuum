@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 from repocontinuum.agent.config import AgentSettings
 from repocontinuum.agent.context.builder import ContextBuilder
 from repocontinuum.agent.providers.base import BaseLLMProvider
-from repocontinuum.agent.providers.exceptions import LLMAuthenticationError
+from repocontinuum.agent.providers.exceptions import LLMAuthenticationError, LLMConfigurationError
 from repocontinuum.agent.providers.fake import FakeLLMProvider
 from repocontinuum.agent.providers.gemini import GeminiProvider
 from repocontinuum.agent.providers.openrouter import OpenRouterProvider
@@ -90,8 +90,13 @@ class AgentService:
                     "LLM provider is set to 'gemini' but GEMINI_API_KEY is not configured.",
                     provider="gemini",
                 )
-        else:
+        elif provider_name == "fake":
             self.provider = FakeLLMProvider()
+        else:
+            raise LLMConfigurationError(
+                f"Unsupported LLM provider '{self.settings.llm_provider}'. Supported providers are: 'openrouter', 'gemini', 'fake'.",
+                provider=self.settings.llm_provider,
+            )
 
     # ---------------- Step 1: Issue Analysis ----------------
 

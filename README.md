@@ -72,8 +72,11 @@ RepoContinuum is a local-first, repository-aware software maintenance assistant 
 
 Install the package in development mode:
 ```powershell
-# From the RepoContinuum directory
-python -m pip install -e .
+# From the RepoContinuum directory (core dependencies + testing tools)
+python -m pip install -e ".[dev]"
+
+# Optional: To include Google Gemini SDK support
+python -m pip install -e ".[gemini]"
 ```
 
 ---
@@ -124,11 +127,11 @@ python -m pytest tests/ -v
 - **Immutable Snapshots:** Repository index snapshots are deterministic and tied to the exact Git commit SHA and parser configuration.
 
 For full architecture and design decisions, see:
-- [Product Requirements Document (PRD)](file:///docs/REPOCONTINUUM_PRD.md)
-- [Implementation Plan](file:///docs/IMPLEMENTATION_PLAN.md)
-- [Security Policy](file:///docs/SECURITY.md)
-- [ADR 0001: Indexer Architecture](file:///docs/adr/0001-indexer-architecture.md)
-- [ADR 0002: Sandbox & Verification Architecture](file:///docs/adr/0002-sandbox-and-verification-architecture.md)
+- [Product Requirements Document (PRD)](docs/REPOCONTINUUM_PRD.md)
+- [Implementation Plan](docs/IMPLEMENTATION_PLAN.md)
+- [Security Policy](docs/SECURITY.md)
+- [ADR 0001: Indexer Architecture](docs/adr/0001-indexer-architecture.md)
+- [ADR 0002: Sandbox & Verification Architecture](docs/adr/0002-sandbox-and-verification-architecture.md)
 
 
 ---

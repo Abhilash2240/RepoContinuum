@@ -111,6 +111,25 @@ export const BenchmarkDashboardPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Synthetic Ablation Protocol Transparency Notice */}
+      <div
+        style={{
+          padding: '0.85rem 1.25rem',
+          background: 'rgba(56, 189, 248, 0.08)',
+          border: '1px solid rgba(56, 189, 248, 0.25)',
+          borderRadius: '0.5rem',
+          fontSize: '0.85rem',
+          color: '#bae6fd',
+          lineHeight: 1.5,
+        }}
+      >
+        <strong>Benchmark Evaluation Protocol:</strong> The figures below represent reproducible results from the
+        Milestone 6 synthetic ablation experiment suite (Seed 42, 22 tasks across 10 multi-task chains). This evaluation
+        compares <em>Baseline A (Isolated Issue Solving)</em>, <em>Baseline B (Repository Planning Only)</em>, and{' '}
+        <em>Baseline C (Full RepoContinuum with Obligation Ledger & Regression Gating)</em> to quantitatively model
+        long-horizon regression resistance and test-selection precision.
+      </div>
+
       {error && (
         <div style={{ padding: '0.75rem 1rem', background: '#450a0a', border: '1px solid #991b1b', borderRadius: '0.5rem', color: '#fca5a5' }}>
           {error}

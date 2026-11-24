@@ -19,6 +19,37 @@ def test_docker_sandbox_fails_closed_when_daemon_stopped(tmp_path: Path) -> None
         assert res.exit_code is None
 
 
+def test_docker_sandbox_successful_execution_when_available(tmp_path: Path) -> None:
+    """Verify DockerSandboxRunner executes container command with strict security flags when Docker is available."""
+    from unittest.mock import MagicMock, patch
+    import subprocess
+
+    runner = DockerSandboxRunner(image_tag="repocontinuum-sandbox:test")
+
+    mock_proc = MagicMock()
+    mock_proc.returncode = 0
+    mock_proc.stdout = "All tests passed"
+    mock_proc.stderr = ""
+
+    with patch.object(runner, "is_available", return_value=True), patch("subprocess.run", return_value=mock_proc) as mock_run:
+        res = runner.run(["pytest", "tests/"], tmp_path)
+
+        assert res.status == CheckStatus.PASSED
+        assert res.exit_code == 0
+        assert res.executed_in_sandbox is True
+        assert "All tests passed" in res.stdout
+
+        # Verify strict container security flags in constructed command
+        called_cmd = mock_run.call_args[0][0]
+        assert called_cmd[0] == "docker"
+        assert called_cmd[1] == "run"
+        assert "--network" in called_cmd and "none" in called_cmd
+        assert "--read-only" in called_cmd
+        assert "--cap-drop=ALL" in called_cmd
+        assert "--security-opt=no-new-privileges:true" in called_cmd
+        assert "repocontinuum-sandbox:test" in called_cmd
+
+
 def test_fake_sandbox_runner_enforces_allowlist(tmp_path: Path) -> None:
     """Verify that fake sandbox runner still strictly validates command allowlists."""
     fake = FakeSandboxRunner()

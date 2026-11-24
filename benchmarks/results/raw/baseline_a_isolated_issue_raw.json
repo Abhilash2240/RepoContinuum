@@ -397,5 +397,24 @@
     "cost_usd": 0.0044,
     "status": "FAILED",
     "failure_reason": "Status: FAILED"
+  },
+  {
+    "task_id": "t3-dialect-formatting",
+    "chain_id": "chn-10-query-builder",
+    "baseline_id": "baseline_a_isolated_issue",
+    "success": false,
+    "regressed_earlier_obligations": 0,
+    "earlier_obligations_rechecked": 2,
+    "active_requirements_passing": 1,
+    "active_requirements_total": 2,
+    "impacted_tests_selected": 2,
+    "total_tests_selected": 7,
+    "total_impacted_tests": 3,
+    "patch_accepted": false,
+    "repair_attempts": 0,
+    "latency_seconds": 5.32,
+    "cost_usd": 0.0021,
+    "status": "FAILED",
+    "failure_reason": "Status: FAILED"
   }
 ]

@@ -1,0 +1,14 @@
+# Provisioned disposable sandbox container for RepoContinuum verification
+FROM python:3.13-slim
+
+WORKDIR /workspace
+
+# Install quality and testing dependencies
+RUN pip install --no-cache-dir \
+    pytest>=8.0.0 \
+    pytest-asyncio>=0.23.0 \
+    pytest-cov>=5.0.0 \
+    ruff>=0.3.0
+
+# Set unprivileged security context
+USER nobody

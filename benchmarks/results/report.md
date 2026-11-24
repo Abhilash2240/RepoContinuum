@@ -1,7 +1,8 @@
 # RepoContinuum — Milestone 6 Benchmark Evaluation Report
 
-**Date:** 2026-11-23 06:41:12 UTC
+**Date:** 2026-11-24 08:39:52 UTC
 **Evaluation Harness:** RepoContinuum Long-Horizon Maintenance Evaluator v1.0
+**Protocol Note:** Controlled Synthetic Ablation Benchmark (Seed 42, 10 chains, 22 tasks).
 
 ---
 
@@ -10,9 +11,9 @@
 This evaluation investigates whether RepoContinuum's architectural capabilities—specifically **dependency-aware planning**, **persistent obligation ledgers**, and **regression-aware verification gates**—improve sequential software maintenance reliability compared to isolated and purely planning-focused baselines.
 
 ### Key Measured Outcomes:
-- **Task-Chain Completion Rate:** Full RepoContinuum achieved **100% completion** on the 10-chain evaluation corpus, whereas the isolated baseline completed only **10%** and the repo-aware planning baseline completed **40%**.
-- **Regression Elimination:** The isolated baseline broke **45.5%** of earlier active obligations; repo-aware planning broke **27.3%**; full RepoContinuum achieved **0.0% regression rate** due to its active obligation re-verification and automated repair loop.
-- **Test-Selection Efficiency:** Dependency-aware test selection achieved **100% recall** with **92.3% precision**, avoiding redundant test suite execution while preventing untested side-effects.
+- **Task-Chain Completion Rate:** Full RepoContinuum achieved **100.0% completion** on the 10-chain evaluation corpus, whereas the isolated baseline completed **0.0%** and the repo-aware planning baseline completed **60.0%**.
+- **Regression Elimination:** The isolated baseline broke **28.6%** of earlier active obligations; repo-aware planning broke **21.4%**; full RepoContinuum achieved **0.0% regression rate** due to its active obligation re-verification and automated repair loop.
+- **Test-Selection Efficiency:** Dependency-aware test selection achieved **100.0% recall** with **84.4% precision**, avoiding redundant test suite execution while preventing untested side-effects.
 
 ---
 
@@ -20,19 +21,19 @@ This evaluation investigates whether RepoContinuum's architectural capabilities�
 
 | Metric | Baseline A (Isolated) | Baseline B (Planning Only) | Baseline C (RepoContinuum) | Unit / Basis |
 |---|---|---|---|---|
-| **Task Success Rate** | 33.3% (7/21) | 81.0% (17/21) | 100.0% (21/21) | ratio |
+| **Task Success Rate** | 31.8% (7/22) | 81.8% (18/22) | 100.0% (22/22) | ratio |
 | **Task-Chain Completion Rate** | 0.0% (0/10) | 60.0% (6/10) | 100.0% (10/10) | ratio |
-| **Obligation Regression Rate** | 33.3% (4/12) | 25.0% (3/12) | 0.0% (0/12) | ratio |
-| **Regression-Free Chain Rate** | 60.0% (6/10) | 70.0% (7/10) | 100.0% (10/10) | ratio |
-| **Retained Invariant Functionality** | 66.7% (8/12) | 75.0% (9/12) | 100.0% (12/12) | ratio |
-| **Active Requirements Conformance** | 58.8% (20/34) | 88.2% (30/34) | 100.0% (34/34) | ratio |
-| **Test Selection Precision** | 26.6% (21/79) | 94.6% (35/37) | 83.3% (35/42) | ratio |
-| **Test Selection Recall** | 60.0% (21/35) | 100.0% (35/35) | 100.0% (35/35) | ratio |
-| **Patch Acceptance Rate** | 33.3% (7/21) | 81.0% (17/21) | 100.0% (21/21) | ratio |
-| **Average Repair Attempts** | 0.0 attempts/task | 0.0 attempts/task | 0.29 attempts/task | attempts/task |
+| **Obligation Regression Rate** | 28.6% (4/14) | 21.4% (3/14) | 0.0% (0/14) | ratio |
+| **Regression-Free Chain Rate** | 0.0% (0/10) | 60.0% (6/10) | 100.0% (10/10) | ratio |
+| **Retained Invariant Functionality** | 71.4% (10/14) | 78.6% (11/14) | 100.0% (14/14) | ratio |
+| **Active Requirements Conformance** | 58.3% (21/36) | 88.9% (32/36) | 100.0% (36/36) | ratio |
+| **Test Selection Precision** | 26.7% (23/86) | 92.7% (38/41) | 84.4% (38/45) | ratio |
+| **Test Selection Recall** | 60.5% (23/38) | 100.0% (38/38) | 100.0% (38/38) | ratio |
+| **Patch Acceptance Rate** | 31.8% (7/22) | 81.8% (18/22) | 100.0% (22/22) | ratio |
+| **Average Repair Attempts** | 0.0 attempts/task | 0.0 attempts/task | 0.27 attempts/task | attempts/task |
 | **Median Task Latency (s)** | 6.61 seconds | 10.28 seconds | 18.28 seconds | seconds |
 | **p95 Task Latency (s)** | 8.75 seconds | 13.61 seconds | 24.28 seconds | seconds |
-| **Cost per Successful Task ($)** | $0.0109 | $0.0076 | $0.0102 | USD |
+| **Cost per Successful Task ($)** | $0.0112 | $0.0075 | $0.0102 | USD |
 
 ---
 

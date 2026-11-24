@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import abc
+import os
 import subprocess
 import time
 from dataclasses import dataclass
@@ -47,16 +48,16 @@ class BaseSandboxRunner(abc.ABC):
 class DockerSandboxRunner(BaseSandboxRunner):
     """Disposable Linux container runner with strict resource and security constraints."""
 
-    DEFAULT_IMAGE = "python:3.13-slim"
+    DEFAULT_IMAGE = os.environ.get("REPOCONTINUUM_SANDBOX_IMAGE", "python:3.13-slim")
 
     def __init__(
         self,
-        image_tag: str = DEFAULT_IMAGE,
+        image_tag: Optional[str] = None,
         cpus: float = 1.0,
         memory_limit: str = "512m",
         pids_limit: int = 64,
     ):
-        self.image_tag = image_tag
+        self.image_tag = image_tag or self.DEFAULT_IMAGE
         self.cpus = cpus
         self.memory_limit = memory_limit
         self.pids_limit = pids_limit

@@ -397,5 +397,24 @@
     "cost_usd": 0.0072,
     "status": "PASSED",
     "failure_reason": null
+  },
+  {
+    "task_id": "t3-dialect-formatting",
+    "chain_id": "chn-10-query-builder",
+    "baseline_id": "baseline_b_repo_planning",
+    "success": true,
+    "regressed_earlier_obligations": 0,
+    "earlier_obligations_rechecked": 2,
+    "active_requirements_passing": 2,
+    "active_requirements_total": 2,
+    "impacted_tests_selected": 3,
+    "total_tests_selected": 4,
+    "total_impacted_tests": 3,
+    "patch_accepted": true,
+    "repair_attempts": 0,
+    "latency_seconds": 8.27,
+    "cost_usd": 0.0042,
+    "status": "PASSED",
+    "failure_reason": null
   }
 ]

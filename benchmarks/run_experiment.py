@@ -74,11 +74,28 @@ def run_benchmark(
 
 
 def generate_markdown_report(reports: list, report_path: Path) -> None:
+    rA = reports[0] if len(reports) > 0 else None
+    rB = reports[1] if len(reports) > 1 else None
+    rC = reports[2] if len(reports) > 2 else None
+
+    # Derive executive summary metrics directly from authoritative evaluation reports
+    cA_pct = f"{rA.metrics['task_chain_completion_rate'].value * 100:.1f}%" if rA else "N/A"
+    cB_pct = f"{rB.metrics['task_chain_completion_rate'].value * 100:.1f}%" if rB else "N/A"
+    cC_pct = f"{rC.metrics['task_chain_completion_rate'].value * 100:.1f}%" if rC else "N/A"
+
+    regA_pct = f"{rA.metrics['regression_rate'].value * 100:.1f}%" if rA else "N/A"
+    regB_pct = f"{rB.metrics['regression_rate'].value * 100:.1f}%" if rB else "N/A"
+    regC_pct = f"{rC.metrics['regression_rate'].value * 100:.1f}%" if rC else "N/A"
+
+    precC_pct = f"{rC.metrics['test_selection_precision'].value * 100:.1f}%" if rC else "N/A"
+    recC_pct = f"{rC.metrics['test_selection_recall'].value * 100:.1f}%" if rC else "N/A"
+
     lines = [
         "# RepoContinuum — Milestone 6 Benchmark Evaluation Report",
         "",
         f"**Date:** {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}",
         "**Evaluation Harness:** RepoContinuum Long-Horizon Maintenance Evaluator v1.0",
+        "**Protocol Note:** Controlled Synthetic Ablation Benchmark (Seed 42, 10 chains, 22 tasks).",
         "",
         "---",
         "",
@@ -87,9 +104,9 @@ def generate_markdown_report(reports: list, report_path: Path) -> None:
         "This evaluation investigates whether RepoContinuum's architectural capabilities—specifically **dependency-aware planning**, **persistent obligation ledgers**, and **regression-aware verification gates**—improve sequential software maintenance reliability compared to isolated and purely planning-focused baselines.",
         "",
         "### Key Measured Outcomes:",
-        "- **Task-Chain Completion Rate:** Full RepoContinuum achieved **100% completion** on the 10-chain evaluation corpus, whereas the isolated baseline completed only **10%** and the repo-aware planning baseline completed **40%**.",
-        "- **Regression Elimination:** The isolated baseline broke **45.5%** of earlier active obligations; repo-aware planning broke **27.3%**; full RepoContinuum achieved **0.0% regression rate** due to its active obligation re-verification and automated repair loop.",
-        "- **Test-Selection Efficiency:** Dependency-aware test selection achieved **100% recall** with **92.3% precision**, avoiding redundant test suite execution while preventing untested side-effects.",
+        f"- **Task-Chain Completion Rate:** Full RepoContinuum achieved **{cC_pct} completion** on the 10-chain evaluation corpus, whereas the isolated baseline completed **{cA_pct}** and the repo-aware planning baseline completed **{cB_pct}**.",
+        f"- **Regression Elimination:** The isolated baseline broke **{regA_pct}** of earlier active obligations; repo-aware planning broke **{regB_pct}**; full RepoContinuum achieved **{regC_pct} regression rate** due to its active obligation re-verification and automated repair loop.",
+        f"- **Test-Selection Efficiency:** Dependency-aware test selection achieved **{recC_pct} recall** with **{precC_pct} precision**, avoiding redundant test suite execution while preventing untested side-effects.",
         "",
         "---",
         "",

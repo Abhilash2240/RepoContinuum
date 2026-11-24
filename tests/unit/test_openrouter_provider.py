@@ -412,14 +412,20 @@ def test_openrouter_secret_redaction():
     assert "[REDACTED]" in exc_info.value.message
 
 
-@pytest.mark.skipif(not os.getenv("OPENROUTER_API_KEY"), reason="Opt-in test requiring live OPENROUTER_API_KEY")
+@pytest.mark.skipif(
+    not AgentSettings().is_openrouter_configured(),
+    reason="Opt-in test requiring configured OPENROUTER_API_KEY",
+)
 def test_live_openrouter_provider_smoke_test():
     """Opt-in live smoke test against OpenRouter Particle-1 Free when OPENROUTER_API_KEY is configured."""
-    api_key = os.environ["OPENROUTER_API_KEY"]
+    settings = AgentSettings()
+    api_key = settings.openrouter_api_key.get_secret_value()
     provider = OpenRouterProvider(
         api_key=api_key,
-        model_name=os.getenv("OPENROUTER_MODEL", "particle-ai/particle-1:free"),
-        base_url=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+        model_name=settings.openrouter_model,
+        base_url=settings.openrouter_base_url,
+        site_url=settings.openrouter_site_url,
+        app_name=settings.openrouter_app_name,
     )
     resp = provider.generate_structured(
         prompt="Analyze a trivial bug where addition function add(a, b) returns a - b instead of a + b.",

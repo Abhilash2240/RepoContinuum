@@ -254,11 +254,9 @@ class BenchmarkEvaluator:
         rechecked_count = sum(t.earlier_obligations_rechecked for t in tasks)
         regression_rate = reg_count / rechecked_count if rechecked_count > 0 else 0.0
 
-        # 4. Regression-free chain rate
-        # A chain is regression-free if sum(regressions) across its tasks == 0
-        chains_with_reg = set(t.chain_id for t in tasks if t.regressed_earlier_obligations > 0)
-        reg_free_chains = chains_count - len(chains_with_reg)
-        reg_free_chain_rate = reg_free_chains / chains_count if chains_count > 0 else 0.0
+        # 4. Regression-free chain rate: completed chains without regressions divided by attempted chains
+        completed_reg_free_chains = completed_chains
+        reg_free_chain_rate = completed_reg_free_chains / chains_count if chains_count > 0 else 0.0
 
         # 5. Retained functionality at checkpoint
         retained_obs = rechecked_count - reg_count
@@ -327,7 +325,7 @@ class BenchmarkEvaluator:
             "regression_free_chain_rate": MetricSummary(
                 metric_name="Regression-Free Chain Rate",
                 value=round(reg_free_chain_rate, 4),
-                numerator=reg_free_chains,
+                numerator=completed_reg_free_chains,
                 denominator=chains_count,
                 sample_size=chains_count,
                 unit="ratio",

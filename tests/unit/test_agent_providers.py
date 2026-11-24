@@ -91,6 +91,7 @@ def test_gemini_provider_requires_api_key():
 
 def test_gemini_provider_error_normalization():
     """Verify error normalizer maps Google GenAI API errors to standard domain exceptions."""
+    pytest.importorskip("google.genai")
     with patch("google.genai.Client"):
         prov = GeminiProvider(api_key="test-dummy-key")
 

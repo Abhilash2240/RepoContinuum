@@ -55,23 +55,11 @@ class AgentService:
         self.service = service
         self.settings = settings or AgentSettings()
 
+        provider_name = (self.settings.llm_provider or "fake").strip().lower()
+
         if provider:
             self.provider = provider
-        elif self.settings.llm_provider.lower() == "gemini":
-            if self.settings.is_gemini_configured():
-                self.provider = GeminiProvider(
-                    api_key=self.settings.gemini_api_key.get_secret_value(),  # type: ignore[union-attr]
-                    model_name=self.settings.gemini_model,
-                    max_output_tokens=self.settings.llm_max_output_tokens,
-                    timeout_seconds=self.settings.llm_timeout_seconds,
-                    max_retries=self.settings.llm_max_retries,
-                )
-            else:
-                raise LLMAuthenticationError(
-                    "LLM provider is set to 'gemini' but GEMINI_API_KEY is not configured.",
-                    provider="gemini",
-                )
-        elif self.settings.llm_provider.lower() == "openrouter":
+        elif provider_name == "openrouter":
             if self.settings.is_openrouter_configured():
                 self.provider = OpenRouterProvider(
                     api_key=self.settings.openrouter_api_key.get_secret_value(),  # type: ignore[union-attr]
@@ -87,6 +75,20 @@ class AgentService:
                 raise LLMAuthenticationError(
                     "LLM provider is set to 'openrouter' but OPENROUTER_API_KEY is not configured.",
                     provider="openrouter",
+                )
+        elif provider_name == "gemini":
+            if self.settings.is_gemini_configured():
+                self.provider = GeminiProvider(
+                    api_key=self.settings.gemini_api_key.get_secret_value(),  # type: ignore[union-attr]
+                    model_name=self.settings.gemini_model,
+                    max_output_tokens=self.settings.llm_max_output_tokens,
+                    timeout_seconds=self.settings.llm_timeout_seconds,
+                    max_retries=self.settings.llm_max_retries,
+                )
+            else:
+                raise LLMAuthenticationError(
+                    "LLM provider is set to 'gemini' but GEMINI_API_KEY is not configured.",
+                    provider="gemini",
                 )
         else:
             self.provider = FakeLLMProvider()

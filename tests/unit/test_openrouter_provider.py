@@ -269,10 +269,25 @@ def test_openrouter_provider_selection():
         AgentService(service=mock_service, settings=settings_no_key)
     assert "OPENROUTER_API_KEY is not configured" in exc_missing.value.message
 
-    # 3. Default remains FakeLLMProvider
-    settings_default = AgentSettings()
+    # 3. Default fallback remains FakeLLMProvider when isolated from active environment
+    settings_default = AgentSettings(_env_file=None, llm_provider="fake")
     svc_default = AgentService(service=mock_service, settings=settings_default)
     assert svc_default.provider.__class__.__name__ == "FakeLLMProvider"
+
+
+def test_active_env_file_selects_openrouter():
+    """12. Verify active .env file selects OpenRouter and raises safe authentication error without key."""
+    settings = AgentSettings()
+    assert settings.llm_provider == "openrouter"
+    assert settings.openrouter_model == "particle-ai/particle-1:free"
+    assert settings.openrouter_base_url == "https://openrouter.ai/api/v1"
+    assert settings.openrouter_app_name == "RepoContinuum"
+
+    mock_service = MagicMock(spec=TaskChainService)
+    with pytest.raises(LLMAuthenticationError) as exc_missing:
+        AgentService(service=mock_service, settings=settings)
+    assert "OPENROUTER_API_KEY is not configured" in exc_missing.value.message
+    assert exc_missing.value.provider == "openrouter"
 
 
 def test_agent_workflow_integration_with_openrouter(tmp_path):

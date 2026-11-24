@@ -3,16 +3,20 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Optional
 from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+_PROJECT_ENV = _PROJECT_ROOT / ".env"
 
 
 class AgentSettings(BaseSettings):
     """Configuration options for the LLM provider, tool limits, and repair budgets."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(_PROJECT_ENV, ".env") if _PROJECT_ENV.exists() else ".env",
         env_file_encoding="utf-8",
         extra="ignore",
         populate_by_name=True,
@@ -20,7 +24,7 @@ class AgentSettings(BaseSettings):
 
     llm_provider: str = Field(
         default="fake",
-        validation_alias=AliasChoices("llm_provider", "REPOCONTINUUM_LLM_PROVIDER", "AI_PROVIDER"),
+        validation_alias=AliasChoices("llm_provider", "AI_PROVIDER", "REPOCONTINUUM_LLM_PROVIDER", "LLM_PROVIDER"),
         description="Active LLM provider: 'gemini', 'openrouter', or 'fake'.",
     )
     gemini_api_key: Optional[SecretStr] = Field(

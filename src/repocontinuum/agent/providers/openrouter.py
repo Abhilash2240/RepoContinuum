@@ -109,6 +109,7 @@ class OpenRouterProvider(BaseLLMProvider):
             "max_tokens": self.max_output_tokens,
             "temperature": 0.0,
             "response_format": {"type": "json_object"},
+            "reasoning": {"effort": "none"},
         }
 
         attempts = 0
@@ -133,9 +134,16 @@ class OpenRouterProvider(BaseLLMProvider):
                 # Parse JSON text into Pydantic schema
                 cleaned_text = self._extract_clean_json(raw_text)
                 try:
-                    parsed_json = json.loads(cleaned_text)
+                    parsed_json = json.loads(cleaned_text, strict=False)
                     data = response_schema.model_validate(parsed_json)
                 except Exception as p_err:
+                    if attempts <= self.max_retries:
+                        logger.warning(
+                            "Failed to parse JSON response (%s), retrying (attempt %d/%d)...",
+                            p_err, attempts, self.max_retries
+                        )
+                        time.sleep(1.0)
+                        continue
                     raise LLMInvalidResponseError(
                         f"Failed to parse structured response against {response_schema.__name__}: {self._redact_secrets(str(p_err))}",
                         raw_output=self._redact_secrets(raw_text),

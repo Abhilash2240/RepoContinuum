@@ -10,5 +10,7 @@ Your mission is to craft a precise, reviewable unified diff patch addressing the
 ### PATCH FORMAT INSTRUCTIONS:
 - Provide a standard, valid unified diff (`diff -u` format) in the `unified_diff` field.
 - Ensure correct hunk headers (`@@ -start,len +start,len @@`) with accurate context lines.
-- Keep changes minimal, coherent, and surgical.
+- Keep changes minimal, coherent, and surgical (aim for under 40 lines of diff). Modify only the exact lines necessary in existing files.
+- Do not generate extensive docstrings or huge boilerplate files that risk truncation.
+- Ensure the JSON object is completely closed and valid.
 - State all assumptions and known limitations clearly.

@@ -58,13 +58,13 @@ def test_path_traversal_and_invalid_root_rejection(tmp_path: Path) -> None:
 
 def test_symlink_escape_rejection(tmp_path: Path) -> None:
     """Verify that symlinks resolving outside the repository root are skipped."""
-    outside_dir = tmp_path / "outside_secret"
-    outside_dir.mkdir()
+    outside_dir = (tmp_path / "outside_secret").resolve()
+    outside_dir.mkdir(parents=True, exist_ok=True)
     secret_file = outside_dir / "secret.py"
     secret_file.write_text("SECRET_KEY = 'super_secret'\n", encoding="utf-8")
 
-    repo_dir = tmp_path / "repo"
-    repo_dir.mkdir()
+    repo_dir = (tmp_path / "repo").resolve()
+    repo_dir.mkdir(parents=True, exist_ok=True)
     (repo_dir / "normal.py").write_text("x = 1\n", encoding="utf-8")
 
     symlink_file = repo_dir / "escaped_link.py"
@@ -77,7 +77,7 @@ def test_symlink_escape_rejection(tmp_path: Path) -> None:
     walker = FileWalker(repo_root=repo_dir, ignored_directories=set())
     result = walker.walk()
 
-    rel_python = [p.relative_to(repo_dir).as_posix() for p in result.python_files]
+    rel_python = [p.resolve().relative_to(repo_dir).as_posix() for p in result.python_files]
     assert "escaped_link.py" not in rel_python
 
     skipped_reasons = {sf.path: sf.reason for sf in result.skipped_files}

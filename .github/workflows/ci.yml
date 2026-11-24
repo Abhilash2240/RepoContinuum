@@ -32,6 +32,17 @@ jobs:
 
       - name: Run Pytest Suite
         run: |
-          python -m pytest tests/ -v --junitxml=junit.xml
+          python -c "
+          import subprocess, sys
+          proc = subprocess.run(['python', '-m', 'pytest', 'tests/', '-v', '--tb=short'], capture_output=True, text=True)
+          print(proc.stdout)
+          if proc.stderr:
+              print(proc.stderr, file=sys.stderr)
+          if proc.returncode != 0:
+              for line in proc.stdout.splitlines():
+                  if line.startswith('FAILED '):
+                      print(f'::error title=Failed Test::{line}')
+              sys.exit(proc.returncode)
+          "
         env:
           PYTHONPATH: ".:src"

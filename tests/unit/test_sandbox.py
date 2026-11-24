@@ -32,7 +32,9 @@ def test_docker_sandbox_successful_execution_when_available(tmp_path: Path) -> N
     mock_proc.stdout = "All tests passed"
     mock_proc.stderr = ""
 
-    with patch.object(runner, "is_available", return_value=True), patch("subprocess.run", return_value=mock_proc) as mock_run:
+    with patch.object(runner, "is_available", return_value=True), patch(
+        "repocontinuum.execution.sandbox.subprocess.run", return_value=mock_proc
+    ) as mock_run:
         res = runner.run(["pytest", "tests/"], tmp_path)
 
         assert res.status == CheckStatus.PASSED

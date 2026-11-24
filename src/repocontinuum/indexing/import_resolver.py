@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sys
-from typing import Dict, List, Set
+from typing import Dict, List, Optional, Set
 
 from repocontinuum.domain.models import ImportEdge, ImportKind, ResolutionStatus
 

@@ -22,7 +22,6 @@ def test_docker_sandbox_fails_closed_when_daemon_stopped(tmp_path: Path) -> None
 def test_docker_sandbox_successful_execution_when_available(tmp_path: Path) -> None:
     """Verify DockerSandboxRunner executes container command with strict security flags when Docker is available."""
     from unittest.mock import MagicMock, patch
-    import subprocess
 
     runner = DockerSandboxRunner(image_tag="repocontinuum-sandbox:test")
 

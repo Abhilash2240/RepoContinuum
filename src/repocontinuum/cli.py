@@ -15,7 +15,12 @@ from repocontinuum import __version__
 from repocontinuum.config import IndexerSettings
 from repocontinuum.domain.models import ParseStatus, RepositorySnapshot
 from repocontinuum.domain.planning import ObligationStatus, TaskStatus
-from repocontinuum.domain.verification import CheckStatus, VerificationRunStatus
+from repocontinuum.domain.verification import (
+    CheckStatus,
+    EvidenceReport,
+    VerificationRun,
+    VerificationRunStatus,
+)
 from repocontinuum.execution.sandbox import DockerSandboxRunner, FakeSandboxRunner
 from repocontinuum.indexing.indexer import RepositoryIndexer
 from repocontinuum.patching.diff_parser import UnifiedDiffParser

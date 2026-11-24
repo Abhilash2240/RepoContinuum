@@ -56,6 +56,14 @@ addopts = "-v --strict-markers"
 line-length = 100
 target-version = "py313"
 
+[tool.ruff.lint]
+select = [
+    "E9",
+    "F63",
+    "F7",
+    "F82",
+]
+
 [tool.mypy]
 python_version = "3.13"
 strict = true

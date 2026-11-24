@@ -2,6 +2,7 @@
 
 import json
 import os
+from pathlib import Path
 from unittest.mock import MagicMock
 import httpx
 import pytest
@@ -275,6 +276,10 @@ def test_openrouter_provider_selection():
     assert svc_default.provider.__class__.__name__ == "FakeLLMProvider"
 
 
+@pytest.mark.skipif(
+    not (Path(__file__).resolve().parents[2] / ".env").exists(),
+    reason="Opt-in test requiring active .env file in project root",
+)
 def test_active_env_file_selects_openrouter():
     """12. Verify active .env file selects OpenRouter and initializes provider or raises safe authentication error."""
     settings = AgentSettings()
@@ -413,8 +418,8 @@ def test_openrouter_secret_redaction():
 
 
 @pytest.mark.skipif(
-    not AgentSettings().is_openrouter_configured(),
-    reason="Opt-in test requiring configured OPENROUTER_API_KEY",
+    os.getenv("OPENROUTER_ENABLE_LIVE_TESTS") != "true" or not AgentSettings().is_openrouter_configured(),
+    reason="Opt-in test requiring OPENROUTER_ENABLE_LIVE_TESTS=true and configured OPENROUTER_API_KEY",
 )
 def test_live_openrouter_provider_smoke_test():
     """Opt-in live smoke test against OpenRouter Particle-1 Free when OPENROUTER_API_KEY is configured."""

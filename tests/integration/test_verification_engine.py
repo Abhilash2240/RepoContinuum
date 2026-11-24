@@ -264,6 +264,8 @@ def test_verification_engine_handles_inconclusive_obligation(sample_git_repo):
 
 def test_verification_engine_docker_fail_closed_when_daemon_stopped(sample_git_repo):
     """Test that DockerSandboxRunner fails closed (NOT_RUN) when daemon is stopped and does not fall back to host."""
+    from unittest.mock import patch as mock_patch
+
     repo_dir, base_sha = sample_git_repo
 
     diff_content = """--- a/math_mod.py
@@ -288,19 +290,17 @@ def test_verification_engine_docker_fail_closed_when_daemon_stopped(sample_git_r
     )
 
     docker_runner = DockerSandboxRunner()
-    # Ensure is_available is false if daemon is not running
     engine = VerificationEngine(sandbox_runner=docker_runner)
 
-    vrun, report = engine.verify_patch(
-        repo_path=repo_dir,
-        task=task,
-        patch=patch,
-        earlier_active_obligations=[],
-        check_commands=[["python", "-m", "py_compile", "math_mod.py"]],
-    )
+    with mock_patch.object(docker_runner, "is_available", return_value=False):
+        vrun, report = engine.verify_patch(
+            repo_path=repo_dir,
+            task=task,
+            patch=patch,
+            earlier_active_obligations=[],
+            check_commands=[["python", "-m", "py_compile", "math_mod.py"]],
+        )
 
-    # In our test environment, Docker daemon is not running, so it must fail closed
-    if not docker_runner.is_available():
         assert report.verification_conclusion == CheckStatus.NOT_RUN
         assert vrun.status == VerificationRunStatus.FAILED
         assert any(c.status == CheckStatus.NOT_RUN for c in report.checks_executed)

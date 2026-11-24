@@ -32,4 +32,6 @@ jobs:
 
       - name: Run Pytest Suite
         run: |
-          python -m pytest tests/ -v
+          python -m pytest tests/ -v --junitxml=junit.xml
+        env:
+          PYTHONPATH: ".:src"

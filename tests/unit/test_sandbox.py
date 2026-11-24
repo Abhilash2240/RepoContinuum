@@ -9,9 +9,11 @@ from repocontinuum.execution.sandbox import DockerSandboxRunner, FakeSandboxRunn
 
 def test_docker_sandbox_fails_closed_when_daemon_stopped(tmp_path: Path) -> None:
     """CRITICAL SECURITY REQUIREMENT: If Docker daemon is stopped, fail closed with NOT_RUN."""
+    from unittest.mock import patch
+
     runner = DockerSandboxRunner()
 
-    if not runner.is_available():
+    with patch.object(runner, "is_available", return_value=False):
         res = runner.run(["python", "-m", "py_compile", "app.py"], tmp_path)
         assert res.status == CheckStatus.NOT_RUN
         assert res.executed_in_sandbox is False
